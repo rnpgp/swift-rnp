@@ -12,7 +12,7 @@
 
 import XCTest
 
-final class LocalizationTests: XCTestCase {
+final class LocalizationTests: CIBaseTestCase {
     /// Languages the container app is required to ship. `en` is the source
     /// language; the rest are the macOS-supported languages added as a
     /// machine-translated first pass (state "needs_review").

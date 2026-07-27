@@ -12,7 +12,7 @@ import XCTest
 @testable import RnpMailUI
 import MailSecurityEngine
 
-final class OnboardingViewTests: XCTestCase {
+final class OnboardingViewTests: CIBaseTestCase {
     func testOnboardingViewRenders() throws {
         let view = OnboardingView(
             isPresented: .constant(true),
