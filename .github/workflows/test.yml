@@ -41,7 +41,7 @@ jobs:
           brew install openssl@3 json-c cmake pkg-config
         else
           sudo apt-get update
-          sudo apt-get install -y libssl-dev libjson-c-dev cmake pkg-config git
+          sudo apt-get install -y libssl-dev libjson-c-dev libbz2-dev cmake pkg-config
         fi
 
     - name: Set up Swift (Linux)
@@ -97,7 +97,7 @@ jobs:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
 
     - name: Run library tests
-      run: swift test --skip-build
+      run: swift test
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
 
