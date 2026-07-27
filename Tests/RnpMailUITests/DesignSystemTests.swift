@@ -9,7 +9,7 @@ import XCTest
 @testable import RnpMailUI
 import TrustStore
 
-final class DesignSystemTests: XCTestCase {
+final class DesignSystemTests: CIBaseTestCase {
     func testGroupedFingerprintBlocks() {
         XCTAssertEqual("ABCD1234EFGH".groupedFingerprintBlocks, "ABCD 1234 EFGH")
         XCTAssertEqual("ABC".groupedFingerprintBlocks, "ABC")

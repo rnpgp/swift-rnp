@@ -83,10 +83,14 @@ jobs:
       run: |
         set -e
         echo "=== librnp version ==="
-        PKG_CONFIG_PATH="${PKG_CONFIG_PATH:-/usr/local/lib/pkgconfig}" rnp --version
-        echo "=== linked OpenSSL ==="
+        rnp --version
+        echo ""
+        echo "=== linked libraries ==="
         otool -L /usr/local/lib/librnp*.dylib 2>/dev/null | head -3 \
           || ldd /usr/local/lib/librnp.so* 2>/dev/null | head -3
+      env:
+        LD_LIBRARY_PATH: /usr/local/lib
+        DYLD_LIBRARY_PATH: /usr/local/lib
 
     - name: Checkout swift-rnp
       uses: actions/checkout@v7
@@ -100,8 +104,10 @@ jobs:
       run: swift test
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+        LD_LIBRARY_PATH: /usr/local/lib
 
     - name: Run RnpDemo smoke test
       run: swift run RnpDemo
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+        LD_LIBRARY_PATH: /usr/local/lib

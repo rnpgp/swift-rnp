@@ -6,7 +6,7 @@
 import XCTest
 @testable import RnpMailUI
 
-final class QRCodeGeneratorTests: XCTestCase {
+final class QRCodeGeneratorTests: CIBaseTestCase {
 
     func testChunkAndReassembleRoundTrip() {
         let original = String(repeating: "A", count: 2000)

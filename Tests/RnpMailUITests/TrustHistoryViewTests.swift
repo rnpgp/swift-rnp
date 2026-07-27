@@ -15,7 +15,7 @@ import XCTest
 import MailSecurityEngine
 import TrustStore
 
-final class TrustHistoryViewTests: XCTestCase {
+final class TrustHistoryViewTests: CIBaseTestCase {
     private static let fingerprintA = "74E2A1E008CB1B1021192AA05225D37282795A2F"
     private static let fingerprintB = "1A2B3C4D5E6F708192A3B4C5D6E7F8091A2B3C4D"
 
