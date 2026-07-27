@@ -24,34 +24,48 @@ jobs:
     - name: Checkout swift-rnp
       uses: actions/checkout@v7
 
+    - name: Install OpenSSL + cmake
+      run: brew install openssl@3 json-c cmake pkg-config
+
     - name: Build RNPFramework.xcframework
       run: ./scripts/build-rnp-framework.sh
+      env:
+        OPENSSL_PREFIX: $(brew --prefix openssl@3)
 
     - name: Inspect xcframework
       run: |
+        set -e
         FW="Vendor/RNPFramework.xcframework"
-        echo "=== Contents ==="
-        ls -la "$FW"
+        echo "=== Top-level ==="
+        ls -la "$FW" | head -20
         echo ""
         echo "=== Architectures ==="
         for variant in "$FW"/*/; do
+          [ -d "$variant" ] || continue
           echo "  $(basename "$variant"):"
-          lipo -info "$variant"*/RNPFramework 2>/dev/null | sed 's/^/    /'
+          lipo -info "$variant"*/RNPFramework 2>/dev/null | sed 's/^/    /' || true
         done
         echo ""
         echo "=== Headers ==="
-        find "$FW" -name '*.h' | head
+        find "$FW" -name '*.h' | head -10
+        echo ""
+        echo "=== Module map ==="
+        find "$FW" -name '*.modulemap' | head -5
 
-    - name: Verify xcarchive can be built
+    - name: Verify Swift can import the framework
       run: |
-        xcodebuild -create-xcframework \
-          -framework Vendor/RNPFramework.xcframework/Info.plist 2>&1 | head -3 || true
-        # Check that swift code can import the framework's umbrella
-        cat > /tmp/test_import.swift <<EOF
+        set -e
+        mkdir -p /tmp/framework-test
+        cat > /tmp/framework-test/main.swift <<'EOF'
         import Foundation
-        #if canImport(RNPFramework)
-        let _: Bool = true
-        #endif
+        import RNPFramework
+
+        public func smokeTest() {
+            let version = "framework imported"
+            print(version)
+        }
         EOF
-        swiftc -F Vendor/RNPFramework.xcframework/macos-arm64_x86_64 -emit-library -o /tmp/lib /tmp/test_import.swift 2>&1 | head -5
-        test -f /tmp/lib && echo "Framework importable via -F path"
+        swiftc -emit-library -o /tmp/framework-test/libtest.dylib \
+          -F Vendor/RNPFramework.xcframework/macos-arm64_x86_64 \
+          /tmp/framework-test/main.swift
+        test -f /tmp/framework-test/libtest.dylib && echo "OK: framework importable"
