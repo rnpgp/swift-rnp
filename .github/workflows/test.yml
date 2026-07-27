@@ -72,7 +72,7 @@ jobs:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
 
     - name: Run library tests
-      run: swift test
+      run: swift test --verbose
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
 
