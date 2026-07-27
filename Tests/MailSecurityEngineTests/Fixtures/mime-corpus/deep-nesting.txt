@@ -1,0 +1,23 @@
+Content-Type: multipart/mixed; boundary="L0"
+
+--L0
+Content-Type: multipart/alternative; boundary="L1"
+
+--L1
+Content-Type: multipart/related; boundary="L2"
+
+--L2
+Content-Type: multipart/signed; boundary="L3"
+
+--L3
+Content-Type: multipart/mixed; boundary="L4"
+
+--L4
+Content-Type: text/plain
+
+deep leaf body
+--L4--
+--L3--
+--L2--
+--L1--
+--L0--

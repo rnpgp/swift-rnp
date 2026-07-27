@@ -1,0 +1,11 @@
+Content-Type: multipart/mixed; boundary="emptyboundary"
+
+--emptyboundary
+Content-Type: text/plain
+
+
+--emptyboundary
+Content-Type: text/plain
+
+non-empty
+--emptyboundary--

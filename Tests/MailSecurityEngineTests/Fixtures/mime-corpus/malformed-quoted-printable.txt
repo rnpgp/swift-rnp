@@ -1,0 +1,7 @@
+Content-Type: text/plain
+Content-Transfer-Encoding: quoted-printable
+
+Hello=20World=XX=YY=ZZ=0G=1H=2I
+Soft break=
+continued line
+=3D=3D=3D

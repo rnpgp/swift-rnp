@@ -1,0 +1,69 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+    tags: [ v* ]
+
+env:
+  RNP_REF: v0.18.1
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+    - name: Setup test matrix
+      id: matrix
+      run: |
+        if [ "${{ github.event.client_payload }}" != "" ]; then
+          echo "matrix=[ '${{ github.event.client_payload.tag }}' ]" >> $GITHUB_OUTPUT
+        else
+          echo "matrix=[ 'v0.18.1', '' ]" >> $GITHUB_OUTPUT
+        fi
+
+  swift-test:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        rnp: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    runs-on: macos-latest
+    steps:
+    - name: Install packages MacOS
+      run: brew install botan json-c
+
+    - name: Checkout rnp
+      uses: actions/checkout@v7
+      with:
+        repository: rnpgp/rnp
+        path: rnp
+        submodules: true
+        ref: ${{ matrix.rnp }}
+
+    - name: Configure rnp
+      run: >
+        cmake -B rnp/build -DCRYPTO_BACKEND=botan3 -DBUILD_TESTING=OFF
+        -DENABLE_DOC=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release rnp
+
+    - name: Build rnp
+      run:  cmake --build rnp/build --parallel
+
+    - name: Install rnp
+      run:  sudo cmake --install rnp/build
+
+    - name: Checkout swift-rnp
+      uses: actions/checkout@v7
+
+    - name: Build swift-rnp
+      run:  swift build
+      env:
+        PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+
+    - name: Test
+      run:  swift test -Xlinker -rpath -Xlinker /usr/local/lib
+      env:
+        PKG_CONFIG_PATH: /usr/local/lib/pkgconfig

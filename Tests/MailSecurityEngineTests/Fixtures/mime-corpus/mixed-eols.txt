@@ -1,0 +1,13 @@
+Content-Type: multipart/mixed; boundary="bnd"
+To: Bob <bob@example.com>
+From: Alice <alice@example.com>
+
+--bnd
+Content-Type: text/plain
+
+LF only part
+--bnd
+Content-Type: text/plain
+
+CRLF part
+--bnd--

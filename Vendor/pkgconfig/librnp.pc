@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../RNPFramework.xcframework/macos-arm64_x86_64/RNPFramework.framework
+exec_prefix=${prefix}
+libdir=${prefix}
+includedir=${prefix}/Headers
+
+Name: rnp
+Description: RNPFramework vendored for RnpMail
+Version: 0.18.1
+Libs: -F${pcfiledir}/../RNPFramework.xcframework/macos-arm64_x86_64 -framework RNPFramework
+Cflags: -I${includedir}

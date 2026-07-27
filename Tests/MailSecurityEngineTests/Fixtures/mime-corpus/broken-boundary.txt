@@ -1,0 +1,11 @@
+Content-Type: multipart/mixed; boundary="abc"
+
+--abc
+Content-Type: text/plain
+
+first part
+--xyz
+Content-Type: text/plain
+
+wrong boundary
+--abc--

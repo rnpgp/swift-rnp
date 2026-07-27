@@ -1,0 +1,11 @@
+Content-Type: multipart/mixed; boundary="dupboundary"
+
+--dupboundary
+Content-Type: text/plain
+
+This body contains --dupboundary inside text and --dupboundary-- too.
+--dupboundary
+Content-Type: text/plain
+
+second part
+--dupboundary--

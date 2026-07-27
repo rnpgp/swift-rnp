@@ -1,0 +1,10 @@
+Content-Type: multipart/mixed; boundary="missingct"
+
+--missingct
+
+part without content type
+--missingct
+Content-Type: application/octet-stream
+
+binary-ish
+--missingct--
