@@ -11,7 +11,11 @@
 //
 
 import CRnp
+#if canImport(Darwin)
 import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import Foundation
 
 /// Function-pointer type matching `rnp_op_encrypt_enable_pkesk_v6`.
