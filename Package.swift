@@ -91,14 +91,6 @@ let package = Package(
             dependencies: ["KeyLifecycle"]
         ),
         .testTarget(
-            name: "RnpMailUITests",
-            dependencies: ["RnpMailUI"]
-        ),
-        .testTarget(
-            name: "MailSecurityUITests",
-            dependencies: ["MailSecurityUI", "MailSecurityEngine", "TrustStore", "Rnp"]
-        ),
-        .testTarget(
             name: "KeyServerClientTests",
             dependencies: ["KeyServerClient"]
         ),

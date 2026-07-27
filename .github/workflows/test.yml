@@ -31,24 +31,10 @@ jobs:
       fail-fast: false
       matrix:
         rnp: ${{ fromJson(needs.prepare.outputs.matrix) }}
-        os: [ macos-14, ubuntu-latest ]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-14
     steps:
     - name: Install librnp build deps
-      run: |
-        set -e
-        if [[ "${{ matrix.os }}" == "macos-14" ]]; then
-          brew install openssl@3 json-c cmake pkg-config
-        else
-          sudo apt-get update
-          sudo apt-get install -y libssl-dev libjson-c-dev libbz2-dev cmake pkg-config
-        fi
-
-    - name: Set up Swift (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      uses: swift-actions/setup-swift@v2
-      with:
-        swift-version: "5.10"
+      run: brew install openssl@3 json-c cmake pkg-config
 
     - name: Checkout rnp
       uses: actions/checkout@v7
@@ -60,18 +46,11 @@ jobs:
 
     - name: Configure rnp (OpenSSL backend)
       run: |
-        set -e
-        if [[ "${{ matrix.os }}" == "macos-14" ]]; then
-          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
-          cmake -B rnp/build -DCRYPTO_BACKEND=openssl \
-            -DOPENSSL_ROOT_DIR="$OPENSSL_PREFIX" \
-            -DBUILD_TESTING=OFF -DENABLE_DOC=OFF \
-            -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release rnp
-        else
-          cmake -B rnp/build -DCRYPTO_BACKEND=openssl \
-            -DBUILD_TESTING=OFF -DENABLE_DOC=OFF \
-            -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release rnp
-        fi
+        OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+        cmake -B rnp/build -DCRYPTO_BACKEND=openssl \
+          -DOPENSSL_ROOT_DIR="$OPENSSL_PREFIX" \
+          -DBUILD_TESTING=OFF -DENABLE_DOC=OFF \
+          -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release rnp
 
     - name: Build rnp
       run: cmake --build rnp/build --parallel
@@ -81,16 +60,8 @@ jobs:
 
     - name: Verify rnp installation
       run: |
-        set -e
-        echo "=== librnp version ==="
         rnp --version
-        echo ""
-        echo "=== linked libraries ==="
-        otool -L /usr/local/lib/librnp*.dylib 2>/dev/null | head -3 \
-          || ldd /usr/local/lib/librnp.so* 2>/dev/null | head -3
-      env:
-        LD_LIBRARY_PATH: /usr/local/lib
-        DYLD_LIBRARY_PATH: /usr/local/lib
+        otool -L /usr/local/lib/librnp*.dylib 2>/dev/null | head -3
 
     - name: Checkout swift-rnp
       uses: actions/checkout@v7
@@ -104,10 +75,8 @@ jobs:
       run: swift test
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
-        LD_LIBRARY_PATH: /usr/local/lib
 
     - name: Run RnpDemo smoke test
       run: swift run RnpDemo
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
-        LD_LIBRARY_PATH: /usr/local/lib
