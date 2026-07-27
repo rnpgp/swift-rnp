@@ -71,6 +71,10 @@ let package = Package(
             name: "KeyServerClient",
             dependencies: []
         ),
+        .executableTarget(
+            name: "RnpDemo",
+            dependencies: ["Rnp"]
+        ),
         .testTarget(
             name: "RnpTests",
             dependencies: ["Rnp"]
