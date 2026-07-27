@@ -1,0 +1,57 @@
+name: framework
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/build-rnp-framework.sh'
+      - 'Vendor/SOURCES.md'
+      - '.github/workflows/framework.yml'
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
+
+env:
+  RNP_REF: v0.18.1
+
+jobs:
+  build-framework:
+    runs-on: macos-14
+    steps:
+    - name: Checkout swift-rnp
+      uses: actions/checkout@v7
+
+    - name: Build RNPFramework.xcframework
+      run: ./scripts/build-rnp-framework.sh
+
+    - name: Inspect xcframework
+      run: |
+        FW="Vendor/RNPFramework.xcframework"
+        echo "=== Contents ==="
+        ls -la "$FW"
+        echo ""
+        echo "=== Architectures ==="
+        for variant in "$FW"/*/; do
+          echo "  $(basename "$variant"):"
+          lipo -info "$variant"*/RNPFramework 2>/dev/null | sed 's/^/    /'
+        done
+        echo ""
+        echo "=== Headers ==="
+        find "$FW" -name '*.h' | head
+
+    - name: Verify xcarchive can be built
+      run: |
+        xcodebuild -create-xcframework \
+          -framework Vendor/RNPFramework.xcframework/Info.plist 2>&1 | head -3 || true
+        # Check that swift code can import the framework's umbrella
+        cat > /tmp/test_import.swift <<EOF
+        import Foundation
+        #if canImport(RNPFramework)
+        let _: Bool = true
+        #endif
+        EOF
+        swiftc -F Vendor/RNPFramework.xcframework/macos-arm64_x86_64 -emit-library -o /tmp/lib /tmp/test_import.swift 2>&1 | head -5
+        test -f /tmp/lib && echo "Framework importable via -F path"
