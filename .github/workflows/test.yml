@@ -5,6 +5,11 @@ on:
   push:
     branches: [ main ]
     tags: [ v* ]
+  workflow_dispatch:
+
+concurrency:
+  group: '${{ github.workflow }}-${{ github.job }}-${{ github.head_ref || github.ref_name }}'
+  cancel-in-progress: true
 
 env:
   RNP_REF: v0.18.1
@@ -15,8 +20,7 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
-    - name: Setup test matrix
-      id: matrix
+    - id: matrix
       run: |
         if [ "${{ github.event.client_payload }}" != "" ]; then
           echo "matrix=[ '${{ github.event.client_payload.tag }}' ]" >> $GITHUB_OUTPUT
@@ -30,11 +34,22 @@ jobs:
       fail-fast: false
       matrix:
         rnp: ${{ fromJson(needs.prepare.outputs.matrix) }}
+        os: [ macos-latest, ubuntu-latest ]
 
-    runs-on: macos-latest
+    runs-on: ${{ matrix.os }}
     steps:
-    - name: Install packages MacOS
-      run: brew install botan json-c
+    - name: Install librnp build deps
+      run: |
+        if [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          brew install botan json-c cmake
+        else
+          sudo apt-get update
+          sudo apt-get install -y libbotan-3-dev libjson-c-dev cmake pkg-config
+        fi
+
+    - name: Set up Swift (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      uses: swift-actions/setup-swift@v2
 
     - name: Checkout rnp
       uses: actions/checkout@v7
@@ -47,23 +62,29 @@ jobs:
     - name: Configure rnp
       run: >
         cmake -B rnp/build -DCRYPTO_BACKEND=botan3 -DBUILD_TESTING=OFF
-        -DENABLE_DOC=OFF -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release rnp
+        -DENABLE_DOC=OFF -DBUILD_SHARED_LIBS=ON
+        -DCMAKE_BUILD_TYPE=Release rnp
 
     - name: Build rnp
-      run:  cmake --build rnp/build --parallel
+      run: cmake --build rnp/build --parallel
 
     - name: Install rnp
-      run:  sudo cmake --install rnp/build
+      run: sudo cmake --install rnp/build
 
     - name: Checkout swift-rnp
       uses: actions/checkout@v7
 
     - name: Build swift-rnp
-      run:  swift build
+      run: swift build
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
 
-    - name: Test
-      run:  swift test -Xlinker -rpath -Xlinker /usr/local/lib
+    - name: Run library tests
+      run: swift test --skip-build
+      env:
+        PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
+
+    - name: Run RnpDemo smoke test
+      run: swift run RnpDemo
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
