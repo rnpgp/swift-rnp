@@ -19,14 +19,16 @@ let package = Package(
         .library(name: "PostQuantum", targets: ["PostQuantum"])
     ],
     targets: [
-        .systemLibrary(
+        .binaryTarget(
+            name: "RNPFramework",
+            url: "https://github.com/rnpgp/swift-rnp/releases/download/v0.1.0/RNPFramework.xcframework.zip",
+            checksum: "4768b371b7043349266264206c23d9b405aaf3e95381f10613a7e6dff320e91f"
+        ),
+        .target(
             name: "CRnp",
+            dependencies: ["RNPFramework"],
             path: "Sources/CRnp",
-            pkgConfig: "librnp",
-            providers: [
-                .brew(["rnp"]),
-                .apt(["librnp-dev"])
-            ]
+            publicHeadersPath: "."
         ),
         .target(
             name: "Rnp",
