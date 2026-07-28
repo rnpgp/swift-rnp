@@ -22,7 +22,7 @@ let package = Package(
         .binaryTarget(
             name: "RNPFramework",
             url: "https://github.com/rnpgp/swift-rnp/releases/download/v0.1.0/RNPFramework.xcframework.zip",
-            checksum: "4768b371b7043349266264206c23d9b405aaf3e95381f10613a7e6dff320e91f"
+            checksum: "600417d407b13efea194c1ddd43fccff42a57811561136f8ac47de0a2e020176"
         ),
         .target(
             name: "CRnp",
