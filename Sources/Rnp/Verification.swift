@@ -83,28 +83,22 @@ extension Rnp {
         return try withMemoryInput(signedMessage, operation: "verify") { input in
             var handle: rnp_op_verify_t?
             try rnpCheck(rnp_op_verify_create(&handle, ffi, input, output.handle), operation: "verify create")
-            guard let operation = handle else {
-                throw RnpError.ffiFailed(
-                    operation: "verify create",
-                    code: rnpStatusSuccess,
-                    message: "unexpected NULL operation"
+            return try withRnpOp(handle, destroy: rnp_op_verify_destroy, operation: "verify") { op in
+                let status = rnp_op_verify_execute(op)
+                let signatures = collectSignatures(operation: op)
+                guard status == rnpStatusSuccess || !signatures.isEmpty else {
+                    throw RnpError.ffiFailed(
+                        operation: "verify execute",
+                        code: status,
+                        message: String(cString: rnp_result_to_string(status))
+                    )
+                }
+                return RnpVerification(
+                    payload: status == rnpStatusSuccess ? try? output.readData() : nil,
+                    signatures: signatures,
+                    encryption: encryptionInfo(operation: op)
                 )
             }
-            defer { rnp_op_verify_destroy(operation) }
-            let status = rnp_op_verify_execute(operation)
-            let signatures = collectSignatures(operation: operation)
-            guard status == rnpStatusSuccess || !signatures.isEmpty else {
-                throw RnpError.ffiFailed(
-                    operation: "verify execute",
-                    code: status,
-                    message: String(cString: rnp_result_to_string(status))
-                )
-            }
-            return RnpVerification(
-                payload: status == rnpStatusSuccess ? try? output.readData() : nil,
-                signatures: signatures,
-                encryption: encryptionInfo(operation: operation)
-            )
         }
     }
 
@@ -122,28 +116,22 @@ extension Rnp {
                     rnp_op_verify_detached_create(&handle, ffi, dataInput, signatureInput),
                     operation: "verify detached create"
                 )
-                guard let operation = handle else {
-                    throw RnpError.ffiFailed(
-                        operation: "verify detached create",
-                        code: rnpStatusSuccess,
-                        message: "unexpected NULL operation"
+                return try withRnpOp(handle, destroy: rnp_op_verify_destroy, operation: "verify detached") { op in
+                    let status = rnp_op_verify_execute(op)
+                    let signatures = collectSignatures(operation: op)
+                    guard status == rnpStatusSuccess || !signatures.isEmpty else {
+                        throw RnpError.ffiFailed(
+                            operation: "verify detached execute",
+                            code: status,
+                            message: String(cString: rnp_result_to_string(status))
+                        )
+                    }
+                    return RnpVerification(
+                        payload: nil,
+                        signatures: signatures,
+                        encryption: encryptionInfo(operation: op)
                     )
                 }
-                defer { rnp_op_verify_destroy(operation) }
-                let status = rnp_op_verify_execute(operation)
-                let signatures = collectSignatures(operation: operation)
-                guard status == rnpStatusSuccess || !signatures.isEmpty else {
-                    throw RnpError.ffiFailed(
-                        operation: "verify detached execute",
-                        code: status,
-                        message: String(cString: rnp_result_to_string(status))
-                    )
-                }
-                return RnpVerification(
-                    payload: nil,
-                    signatures: signatures,
-                    encryption: encryptionInfo(operation: operation)
-                )
             }
         }
     }

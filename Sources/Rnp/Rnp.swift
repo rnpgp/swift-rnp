@@ -531,28 +531,22 @@ public final class Rnp {
         return try withMemoryInput(plaintext, operation: "encrypt") { input in
             var handle: rnp_op_encrypt_t?
             try rnpCheck(rnp_op_encrypt_create(&handle, ffi, input, output.handle), operation: "encrypt create")
-            guard let operation = handle else {
-                throw RnpError.ffiFailed(
-                    operation: "encrypt create",
-                    code: rnpStatusSuccess,
-                    message: "unexpected NULL operation"
-                )
+            return try withRnpOp(handle, destroy: rnp_op_encrypt_destroy, operation: "encrypt") { op in
+                for key in recipients {
+                    try rnpCheck(rnp_op_encrypt_add_recipient(op, key.handle), operation: "encrypt add recipient")
+                }
+                try rnpCheck(rnp_op_encrypt_set_cipher(op, cipher), operation: "encrypt set cipher")
+                try rnpCheck(rnp_op_encrypt_set_hash(op, hash), operation: "encrypt set hash")
+                try rnpCheck(rnp_op_encrypt_set_armor(op, armored), operation: "encrypt set armor")
+                if case .ocb = aead {
+                    try rnpCheck(rnp_op_encrypt_set_aead(op, "OCB"), operation: "encrypt set aead")
+                }
+                if pkeskVersion == .v6, let fn = ExperimentalSymbolTable.enablePKESKv6 {
+                    try rnpCheck(fn(op), operation: "encrypt enable pkesk v6")
+                }
+                try rnpCheck(rnp_op_encrypt_execute(op), operation: "encrypt execute")
+                return try output.readData()
             }
-            defer { rnp_op_encrypt_destroy(operation) }
-            for key in recipients {
-                try rnpCheck(rnp_op_encrypt_add_recipient(operation, key.handle), operation: "encrypt add recipient")
-            }
-            try rnpCheck(rnp_op_encrypt_set_cipher(operation, cipher), operation: "encrypt set cipher")
-            try rnpCheck(rnp_op_encrypt_set_hash(operation, hash), operation: "encrypt set hash")
-            try rnpCheck(rnp_op_encrypt_set_armor(operation, armored), operation: "encrypt set armor")
-            if case .ocb = aead {
-                try rnpCheck(rnp_op_encrypt_set_aead(operation, "OCB"), operation: "encrypt set aead")
-            }
-            if pkeskVersion == .v6, let fn = ExperimentalSymbolTable.enablePKESKv6 {
-                try rnpCheck(fn(operation), operation: "encrypt enable pkesk v6")
-            }
-            try rnpCheck(rnp_op_encrypt_execute(operation), operation: "encrypt execute")
-            return try output.readData()
         }
     }
 
@@ -638,19 +632,13 @@ public final class Rnp {
                 ? rnp_op_sign_detached_create(&handle, ffi, input, output.handle)
                 : rnp_op_sign_create(&handle, ffi, input, output.handle)
             try rnpCheck(status, operation: "sign create")
-            guard let operation = handle else {
-                throw RnpError.ffiFailed(
-                    operation: "sign create",
-                    code: rnpStatusSuccess,
-                    message: "unexpected NULL operation"
-                )
+            return try withRnpOp(handle, destroy: rnp_op_sign_destroy, operation: "sign") { op in
+                try rnpCheck(rnp_op_sign_add_signature(op, key.handle, nil), operation: "sign add signature")
+                try rnpCheck(rnp_op_sign_set_hash(op, hash), operation: "sign set hash")
+                try rnpCheck(rnp_op_sign_set_armor(op, armored), operation: "sign set armor")
+                try rnpCheck(rnp_op_sign_execute(op), operation: "sign execute")
+                return try output.readData()
             }
-            defer { rnp_op_sign_destroy(operation) }
-            try rnpCheck(rnp_op_sign_add_signature(operation, key.handle, nil), operation: "sign add signature")
-            try rnpCheck(rnp_op_sign_set_hash(operation, hash), operation: "sign set hash")
-            try rnpCheck(rnp_op_sign_set_armor(operation, armored), operation: "sign set armor")
-            try rnpCheck(rnp_op_sign_execute(operation), operation: "sign execute")
-            return try output.readData()
         }
     }
 
@@ -666,16 +654,10 @@ public final class Rnp {
         return try withMemoryInput(signedMessage, operation: "verify") { input in
             var handle: rnp_op_verify_t?
             try rnpCheck(rnp_op_verify_create(&handle, ffi, input, output.handle), operation: "verify create")
-            guard let operation = handle else {
-                throw RnpError.ffiFailed(
-                    operation: "verify create",
-                    code: rnpStatusSuccess,
-                    message: "unexpected NULL operation"
-                )
+            return try withRnpOp(handle, destroy: rnp_op_verify_destroy, operation: "verify") { op in
+                try rnpCheck(rnp_op_verify_execute(op), operation: "verify execute")
+                return try output.readData()
             }
-            defer { rnp_op_verify_destroy(operation) }
-            try rnpCheck(rnp_op_verify_execute(operation), operation: "verify execute")
-            return try output.readData()
         }
     }
 
@@ -690,15 +672,9 @@ public final class Rnp {
                     rnp_op_verify_detached_create(&handle, ffi, dataInput, signatureInput),
                     operation: "verify detached create"
                 )
-                guard let operation = handle else {
-                    throw RnpError.ffiFailed(
-                        operation: "verify detached create",
-                        code: rnpStatusSuccess,
-                        message: "unexpected NULL operation"
-                    )
+                try withRnpOp(handle, destroy: rnp_op_verify_destroy, operation: "verify detached") { op in
+                    try rnpCheck(rnp_op_verify_execute(op), operation: "verify detached execute")
                 }
-                defer { rnp_op_verify_destroy(operation) }
-                try rnpCheck(rnp_op_verify_execute(operation), operation: "verify detached execute")
             }
         }
     }

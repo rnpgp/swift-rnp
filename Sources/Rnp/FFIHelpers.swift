@@ -85,3 +85,30 @@ internal func withMemoryInput<T>(
     defer { rnp_input_destroy(inputHandle) }
     return try body(inputHandle)
 }
+
+/// Scoped access to a librnp operation handle. The caller has already run
+/// `rnp_op_X_create(&handle, ...)` and checked the create status; this
+/// helper guards that the resulting handle is non-NULL, defers its
+/// destroy call, and hands the live handle to `body` for parameter
+/// setting, execution, and output reading.
+///
+/// Each call site previously inlined the same 5 lines (guard + throw +
+/// defer + body). With six op types in the codebase (encrypt, sign,
+/// sign_detached, verify, verify_detached, generate), the inlining was
+/// both noisy and a place to drift.
+internal func withRnpOp<Handle, Result>(
+    _ handle: Handle?,
+    destroy: (Handle?) -> rnp_result_t,
+    operation name: String,
+    _ body: (Handle) throws -> Result
+) throws -> Result {
+    guard let h = handle else {
+        throw RnpError.ffiFailed(
+            operation: "\(name) create",
+            code: rnpStatusSuccess,
+            message: "unexpected NULL operation"
+        )
+    }
+    defer { _ = destroy(h) }
+    return try body(h)
+}
