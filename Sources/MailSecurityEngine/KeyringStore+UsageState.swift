@@ -41,7 +41,7 @@ public struct RecipientResolution: Equatable {
     }
 }
 
-extension KeyManager {
+extension KeyringStore {
     /// Current usage state for the fingerprint. Defaults to `.active` when
     /// the fingerprint has no recorded state.
     public func usageState(forFingerprint fingerprint: String) -> KeyUsageState {
@@ -83,52 +83,6 @@ extension KeyManager {
         try listKeys().filter { usageState(forFingerprint: $0.fingerprint) == .archived }
     }
 
-    /// Selects the active secret key for `userID` (email or full UID),
-    /// skipping any key whose usage state is `.archived`. Returns `nil`
-    /// when no eligible key exists.
-    public func activeSigningKey(forUserID userID: String) throws -> RnpKey? {
-        try withRnp { rnp in
-            guard let key = try rnp.locateKey(userID) else {
-                return nil as RnpKey?
-            }
-            let fpr = try key.fingerprint
-            guard usageState(forFingerprint: fpr) == .active else {
-                return nil as RnpKey?
-            }
-            return key
-        }
-    }
-
-    /// Resolves recipient addresses to active keys, distinguishing "no
-    /// key at all" from "only an archived key." The encode pipeline uses
-    /// this to surface distinct UX for the two cases.
-    public func resolveActiveRecipients(
-        addresses: [String]
-    ) throws -> RecipientResolution {
-        try withRnp { rnp in
-            var resolved: [String: KeyInfo] = [:]
-            var missing: [String] = []
-            var archivedOnly: [String] = []
-            for address in addresses {
-                guard let key = try rnp.locateKey(address) else {
-                    missing.append(address)
-                    continue
-                }
-                let fpr = try key.fingerprint
-                if usageState(forFingerprint: fpr) != .active {
-                    archivedOnly.append(address)
-                    continue
-                }
-                if let info = try? makeKeyInfo(key: key, primaryUserID: address) {
-                    resolved[address] = info
-                } else {
-                    missing.append(address)
-                }
-            }
-            return RecipientResolution(resolved: resolved, missing: missing, archivedOnly: archivedOnly)
-        }
-    }
-
     /// Removes the state record for a fingerprint. Used by "delete forever"
     /// after the key has been removed from the keyring.
     public func removeUsageRecord(forFingerprint fingerprint: String) throws {
@@ -140,7 +94,7 @@ extension KeyManager {
 /// revoke succeeds; pass the same reason code so the archive record carries
 /// provenance. Separated from the revoke call itself so existing callers
 /// don't need to change.
-public extension KeyManager {
+public extension KeyringStore {
     /// Records the post-revoke usage state for a key. When the revocation
     /// reason is `superseded`, the key is auto-archived (decrypt-only) so
     /// historical mail remains readable. Other revocation reasons are also

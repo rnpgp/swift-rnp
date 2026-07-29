@@ -1,5 +1,5 @@
 //
-//  KeyManager+UserIDs.swift
+//  KeyringStore+UserIDs.swift
 //  MailSecurityEngine
 //
 //  Engine-layer convenience for adding user IDs to existing secret keys.
@@ -11,7 +11,7 @@
 import Foundation
 import Rnp
 
-public extension KeyManager {
+public extension KeyringStore {
     /// Adds a user ID to the secret key with the given fingerprint and
     /// persists the keyrings.
     ///

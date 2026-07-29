@@ -69,7 +69,7 @@ public final class MessageSecurityCore {
         // unverified note because it carries the fetch/update remedies.
         var expiredKeys: [ExpiredRecipientKey] = []
         for recipient in message.recipientAddresses where !status.missingRecipientKeys.contains(recipient) {
-            if KeyManager.addressesMatch(recipient, message.fromAddress) {
+            if KeyringStore.addressesMatch(recipient, message.fromAddress) {
                 continue
             }
             if trustStore.hasConflict(forEmail: recipient) {
@@ -399,7 +399,7 @@ public final class MessageSecurityCore {
         let recipients = message.recipientAddresses
         guard composeContext.shouldEncrypt,
               senderKeyAvailable(message.fromAddress),
-              !recipients.contains(where: { KeyManager.addressesMatch($0, message.fromAddress) })
+              !recipients.contains(where: { KeyringStore.addressesMatch($0, message.fromAddress) })
         else {
             return recipients
         }
