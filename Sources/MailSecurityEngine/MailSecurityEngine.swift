@@ -14,8 +14,11 @@
 import Autocrypt
 import Foundation
 @_exported import KeyringStore
+@_exported import KeyServerClient
+@_exported import KeyStateStore
+@_exported import KeyLifecycle
 import Rnp
-import TrustStore
+@_exported import TrustStore
 
 /// Wire format used when encoding a message.
 public enum MessageFormat {

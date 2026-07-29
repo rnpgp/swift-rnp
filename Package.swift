@@ -64,14 +64,14 @@ let package = Package(
         ),
         .target(
             name: "RnpMailUI",
-            dependencies: ["MailSecurityEngine", "KeyLifecycle", "KeyServerClient", "TrustStore", "KeyStateStore"],
+            dependencies: ["MailSecurityEngine"],
             resources: [
                 .copy("Resources/Licenses")
             ]
         ),
         .target(
             name: "MailSecurityUI",
-            dependencies: ["MailSecurityEngine", "TrustStore"]
+            dependencies: ["MailSecurityEngine"]
         ),
         .target(
             name: "KeyServerClient",
