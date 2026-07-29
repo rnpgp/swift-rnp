@@ -1,5 +1,5 @@
 //
-//  KeyManager+V6KeyGeneration.swift
+//  KeyringStore+V6KeyGeneration.swift
 //  MailSecurityEngine
 //
 //  Engine-layer opt-in for v6 primary-key generation. v6 keys are
@@ -9,7 +9,7 @@
 import Foundation
 import Rnp
 
-public extension KeyManager {
+public extension KeyringStore {
     /// Generates a v6 primary keypair with a matching encryption subkey
     /// and persists the keyrings.
     ///

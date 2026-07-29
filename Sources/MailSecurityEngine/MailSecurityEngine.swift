@@ -281,7 +281,7 @@ public final class MailSecurityEngine {
                         // (encrypt-to-self): a trust problem or key-change
                         // conflict recorded for the sender's address must not
                         // block encrypting to oneself.
-                        let isSender = KeyManager.addressesMatch(recipient, request.sender)
+                        let isSender = KeyringStore.addressesMatch(recipient, request.sender)
                         if !isSender,
                            keyManager.trustStore.state(forFpr: fingerprint) == .problem
                             || keyManager.trustStore.hasConflict(forEmail: recipient)

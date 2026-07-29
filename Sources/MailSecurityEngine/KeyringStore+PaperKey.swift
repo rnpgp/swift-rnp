@@ -1,5 +1,5 @@
 //
-//  KeyManager+PaperKey.swift
+//  KeyringStore+PaperKey.swift
 //  MailSecurityEngine
 //
 //  Engine-layer convenience for paper-key export. Wraps
@@ -9,7 +9,7 @@
 import Foundation
 import Rnp
 
-public extension KeyManager {
+public extension KeyringStore {
     /// Produces a paperkey-format text export of the secret key,
     /// including header lines identifying the key and a hex body
     /// suitable for printing.
