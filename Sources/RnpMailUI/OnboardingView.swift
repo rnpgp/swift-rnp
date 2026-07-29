@@ -203,6 +203,14 @@ public struct OnboardingView: View {
             .keyboardShortcut(.defaultAction)
             .accessibilityIdentifier("onboarding.welcome.continue")
             .padding(.top, RnpSpacing.xxs)
+            Button("onboarding.skip.button") {
+                isPresented = false
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .keyboardShortcut(.escape, modifiers: [])
+            .accessibilityIdentifier("onboarding.welcome.skip")
             Spacer()
             Spacer()
         }
@@ -245,6 +253,14 @@ public struct OnboardingView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("onboarding.restore")
+            Button("onboarding.skip.button") {
+                isPresented = false
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .keyboardShortcut(.escape, modifiers: [])
+            .accessibilityIdentifier("onboarding.setup.skip")
             Spacer()
             Spacer()
         }

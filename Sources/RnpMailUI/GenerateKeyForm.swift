@@ -35,23 +35,35 @@ public struct GenerateKeyForm: View {
                     .font(.headline)
             }
 
-            HStack(spacing: RnpSpacing.sm) {
-                TextField("generateForm.name.placeholder", text: $viewModel.name)
-                    .accessibilityIdentifier("generateform.name")
-                TextField("generateForm.email.placeholder", text: $viewModel.email)
-                    .accessibilityIdentifier("generateform.email")
+            VStack(alignment: .leading, spacing: RnpSpacing.xxs) {
+                Text("generateForm.name.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: RnpSpacing.sm) {
+                    TextField("generateForm.name.placeholder", text: $viewModel.name)
+                        .accessibilityIdentifier("generateform.name")
+                    TextField("generateForm.email.placeholder", text: $viewModel.email)
+                        .accessibilityIdentifier("generateform.email")
+                }
             }
 
-            Picker("generateForm.algorithm.label", selection: $viewModel.algorithm) {
-                Text("generateForm.algorithm.ed25519").tag(KeyAlgorithm.ed25519)
-                Text("generateForm.algorithm.rsa").tag(KeyAlgorithm.rsa)
-                Text("generateForm.algorithm.ecdsa").tag(KeyAlgorithm.ecdsa)
+            VStack(alignment: .leading, spacing: RnpSpacing.xxs) {
+                Text("generateForm.algorithm.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("generateForm.algorithm.label", selection: $viewModel.algorithm) {
+                    Text("generateForm.algorithm.ed25519").tag(KeyAlgorithm.ed25519)
+                    Text("generateForm.algorithm.rsa").tag(KeyAlgorithm.rsa)
+                    Text("generateForm.algorithm.ecdsa").tag(KeyAlgorithm.ecdsa)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("generateform.algorithm")
             }
-            .pickerStyle(.segmented)
-            .accessibilityIdentifier("generateform.algorithm")
 
-            HStack {
+            VStack(alignment: .leading, spacing: RnpSpacing.xxs) {
                 Text("generateForm.expires.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 Picker("generateForm.expires.label", selection: $viewModel.expirationDays) {
                     Text("generateForm.expiry.1year").tag(365)
                     Text("generateForm.expiry.2years").tag(730)
@@ -63,13 +75,21 @@ public struct GenerateKeyForm: View {
             }
 
             VStack(alignment: .leading, spacing: RnpSpacing.xxs) {
+                Text("generateForm.passphrase.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 SecureField("generateForm.passphrase.placeholder", text: $viewModel.passphrase)
                     .accessibilityIdentifier("generateform.passphrase")
                 PassphraseStrengthMeter(passphrase: viewModel.passphrase)
             }
 
-            SecureField("generateForm.confirm.placeholder", text: $viewModel.confirmPassphrase)
-                .accessibilityIdentifier("generateform.confirm-passphrase")
+            VStack(alignment: .leading, spacing: RnpSpacing.xxs) {
+                Text("generateForm.confirm.label")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                SecureField("generateForm.confirm.placeholder", text: $viewModel.confirmPassphrase)
+                    .accessibilityIdentifier("generateform.confirm-passphrase")
+            }
 
             if viewModel.passphrase != viewModel.confirmPassphrase, !viewModel.confirmPassphrase.isEmpty {
                 RnpInlineError(
@@ -98,7 +118,7 @@ public struct GenerateKeyForm: View {
                 .accessibilityIdentifier("generateform.create")
             }
         }
-        .frame(width: 440)
+        .frame(maxWidth: 480)
         .padding(RnpSpacing.xl)
     }
 }
