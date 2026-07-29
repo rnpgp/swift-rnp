@@ -46,92 +46,36 @@ public struct EngineRecipientStatus: Equatable, Sendable {
 public extension MessageSecurityCore {
     /// Produces a per-recipient status breakdown for the compose UX.
     /// Reads from the engine's trust store, keyring, and key-state
-    /// store to classify each address.
+    /// store to build a snapshot per address, then delegates the
+    /// actual classification to the pure `RecipientClassifier`.
     func recipientDiagnostics(
         forRecipients addresses: [String]
     ) -> [EngineRecipientStatus] {
         addresses.map { address in
-            classify(address: address)
+            let snapshot = makeSnapshot(for: address)
+            let state = RecipientClassifier.classify(snapshot)
+            return EngineRecipientStatus(
+                address: snapshot.address,
+                state: state,
+                fingerprintShort: snapshot.keyInfo.map { shortFingerprint($0.fingerprint) },
+                algorithmLabel: snapshot.keyInfo?.algorithmLabel
+            )
         }
     }
 
-    private func classify(address: String) -> EngineRecipientStatus {
-        do {
-            let resolution = try engine.keyManager.resolveActiveRecipients(addresses: [address])
-            if resolution.missing.contains(address) {
-                // Missing OR archived-only — check archived.
-                if resolution.archivedOnly.contains(address) {
-                    return EngineRecipientStatus(address: address, state: .archived)
-                }
-                return EngineRecipientStatus(address: address, state: .missingKey)
-            }
-            guard let info = resolution.resolved[address] else {
-                return EngineRecipientStatus(address: address, state: .missingKey)
-            }
-            // Trust state.
-            if engine.keyManager.trustStore.hasConflict(forEmail: address) {
-                return EngineRecipientStatus(
-                    address: address,
-                    state: .keyChangedConflict,
-                    fingerprintShort: shortFingerprint(info.fingerprint),
-                    algorithmLabel: info.algorithmLabel
-                )
-            }
-            let trust = engine.keyManager.trustStore.state(forEmail: address)
-            // Revoked key.
-            if info.isRevoked {
-                return EngineRecipientStatus(
-                    address: address,
-                    state: .revoked,
-                    fingerprintShort: shortFingerprint(info.fingerprint),
-                    algorithmLabel: info.algorithmLabel
-                )
-            }
-            // Expired.
-            if let expiration = info.expirationDate {
-                let now = Date()
-                if expiration <= now {
-                    return EngineRecipientStatus(
-                        address: address,
-                        state: .expired(daysUntilExpiry: nil),
-                        fingerprintShort: shortFingerprint(info.fingerprint),
-                        algorithmLabel: info.algorithmLabel
-                    )
-                }
-                let days = Calendar.current.dateComponents([.day], from: now, to: expiration).day
-                if let days, days < 60 {
-                    return EngineRecipientStatus(
-                        address: address,
-                        state: .expired(daysUntilExpiry: days),
-                        fingerprintShort: shortFingerprint(info.fingerprint),
-                        algorithmLabel: info.algorithmLabel
-                    )
-                }
-            }
-            // Healthy.
-            switch trust {
-            case .verified: return EngineRecipientStatus(
-                address: address,
-                state: .verified,
-                fingerprintShort: shortFingerprint(info.fingerprint),
-                algorithmLabel: info.algorithmLabel
-            )
-            case .unverified: return EngineRecipientStatus(
-                address: address,
-                state: .unverified,
-                fingerprintShort: shortFingerprint(info.fingerprint),
-                algorithmLabel: info.algorithmLabel
-            )
-            case .problem: return EngineRecipientStatus(
-                address: address,
-                state: .keyChangedConflict,
-                fingerprintShort: shortFingerprint(info.fingerprint),
-                algorithmLabel: info.algorithmLabel
-            )
-            }
-        } catch {
-            return EngineRecipientStatus(address: address, state: .missingKey)
-        }
+    private func makeSnapshot(for address: String) -> RecipientSnapshot {
+        let resolution = (try? engine.keyManager.resolveActiveRecipients(addresses: [address]))
+            ?? RecipientResolution(resolved: [:], missing: [address], archivedOnly: [])
+        let isMissing = resolution.missing.contains(address)
+        let isArchivedOnly = resolution.archivedOnly.contains(address)
+        let keyInfo: KeyInfo? = (isMissing || isArchivedOnly) ? nil : resolution.resolved[address]
+        return RecipientSnapshot(
+            address: address,
+            keyInfo: keyInfo,
+            isArchivedOnly: isArchivedOnly,
+            trustState: engine.keyManager.trustStore.state(forEmail: address),
+            hasTrustConflict: engine.keyManager.trustStore.hasConflict(forEmail: address)
+        )
     }
 
     private func shortFingerprint(_ fpr: String) -> String {
