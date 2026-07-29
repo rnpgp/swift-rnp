@@ -97,24 +97,16 @@ public enum PassphraseReadResult: Equatable {
 
 /// Stores and retrieves the keyring passphrase in the login Keychain.
 public enum KeychainPassphraseStore {
-    static let service = "RNP for Mail keyring"
+    static let service = KeychainItemCRUD.service
     /// Internal (not private) so `@testable` clients can probe individual
     /// items without going through the prompting read path.
     static let plainAccount = "keyring-passphrase"
     static let biometricAccount = "keyring-passphrase.biometric"
 
     /// Keychain access group shared by the container app and the Mail
-    /// extension. Driven by the `RNPMAILKeychainAccessGroup` Info.plist key;
-    /// `nil` for unsigned local builds where no access group is provisioned.
-    private static let accessGroup: String? = {
-        guard let value = Bundle.main.object(forInfoDictionaryKey: "RNPMAILKeychainAccessGroup") as? String,
-              !value.isEmpty,
-              !value.hasPrefix("$(")
-        else {
-            return nil
-        }
-        return value
-    }()
+    /// extension. Re-exported from `KeychainItemCRUD` for source compat
+    /// with existing internal callers.
+    static var accessGroup: String? { KeychainItemCRUD.accessGroup }
 
     // MARK: - Session cache
 
@@ -576,49 +568,15 @@ public enum KeychainPassphraseStore {
 
     // MARK: - Private
 
-    /// Raw outcome of reading one Keychain item. Internal so `@testable`
-    /// clients can probe items without triggering Touch ID.
-    enum RawRead: Equatable {
-        case found(String)
-        case notFound
-        case failed(OSStatus)
-    }
+    /// Raw outcome of reading one Keychain item. Re-exported from
+    /// `KeychainItemCRUD` for `@testable` clients that already reference
+    /// it via `KeychainPassphraseStore.RawRead`.
+    typealias RawRead = KeychainItemCRUD.RawRead
 
     /// Reads a single item. Internal so `@testable` clients can verify which
     /// items exist and whether they enforce authentication.
     static func read(account: String, allowingAuthenticationUI: Bool) -> RawRead {
-        var query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecReturnData: true,
-            kSecMatchLimit: kSecMatchLimitOne,
-        ]
-        if allowingAuthenticationUI {
-            // An authentication context carries the prompt text (and lets
-            // the keychain reuse one LA session per read).
-            let context = LAContext()
-            context.localizedReason = "Unlock your RNP keyring"
-            query[kSecUseAuthenticationContext] = context
-        } else {
-            query[kSecUseAuthenticationUI] = kSecUseAuthenticationUISkip
-        }
-        if let accessGroup {
-            query[kSecAttrAccessGroup] = accessGroup
-        }
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        switch status {
-        case errSecSuccess:
-            guard let data = item as? Data else {
-                return .failed(errSecSuccess)
-            }
-            return .found(String(decoding: data, as: UTF8.self))
-        case errSecItemNotFound:
-            return .notFound
-        default:
-            return .failed(status)
-        }
+        KeychainItemCRUD.read(account: account, allowingAuthenticationUI: allowingAuthenticationUI)
     }
 
     /// Stores the passphrase for the given account, replacing any existing item.
@@ -629,41 +587,12 @@ public enum KeychainPassphraseStore {
     ///   - accessControl: an optional access control object. When `nil` the
     ///     item is protected by the standard device-unlocked policy.
     private static func store(_ passphrase: String, account: String, accessControl: SecAccessControl?) throws {
-        let data = Data(passphrase.utf8)
-
-        // Remove any existing item so the ACL/accessibility can be changed.
-        var deleteQuery: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-        ]
-        if let accessGroup {
-            deleteQuery[kSecAttrAccessGroup] = accessGroup
-        }
-        SecItemDelete(deleteQuery as CFDictionary)
-
-        var item: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-            kSecValueData: data,
-        ]
-        if let accessGroup {
-            item[kSecAttrAccessGroup] = accessGroup
-        }
-
-        if let accessControl {
-            item[kSecAttrAccessControl] = accessControl
-            item[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-        } else {
-            // Accessible only while the device is unlocked; not synced.
-            item[kSecAttrAccessible] = kSecAttrAccessibleWhenUnlocked
-        }
-
-        let status = SecItemAdd(item as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.unhandled(status: status)
-        }
+        try KeychainItemCRUD.store(
+            passphrase,
+            account: account,
+            accessibility: kSecAttrAccessibleWhenUnlocked,
+            accessControl: accessControl
+        )
     }
 
     /// Attempts to store the passphrase with Touch ID protection.
@@ -715,15 +644,7 @@ public enum KeychainPassphraseStore {
     }
 
     private static func delete(account: String) {
-        var query: [CFString: Any] = [
-            kSecClass: kSecClassGenericPassword,
-            kSecAttrService: service,
-            kSecAttrAccount: account,
-        ]
-        if let accessGroup {
-            query[kSecAttrAccessGroup] = accessGroup
-        }
-        SecItemDelete(query as CFDictionary)
+        KeychainItemCRUD.delete(account: account)
     }
 
     private static func randomPassphrase() -> String {

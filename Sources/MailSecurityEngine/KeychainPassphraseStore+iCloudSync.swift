@@ -9,7 +9,9 @@
 //  passphrase alone is useless without the secret-key material (which
 //  is restored via the paper-key path).
 //
-//  Additive: the base KeychainPassphraseStore API is unchanged.
+//  Additive: the base KeychainPassphraseStore API is unchanged. The
+//  actual `SecItem*` calls go through `KeychainItemCRUD` so the iCloud
+//  path and the local-only path share one CRUD implementation.
 //
 
 import Foundation
@@ -41,67 +43,38 @@ public extension KeychainPassphraseStore {
                 return .storageFailed("no passphrase to sync; create one first")
             }
             do {
-                try store(current, account: icloudSyncAccount, accessControl: nil, synchronizable: true)
+                try KeychainItemCRUD.store(
+                    current,
+                    account: icloudSyncAccount,
+                    accessibility: kSecAttrAccessibleAfterFirstUnlock,
+                    accessControl: nil,
+                    synchronizable: true
+                )
             } catch {
                 return .storageFailed(error.localizedDescription)
             }
             return nil
         } else {
-            delete(account: icloudSyncAccount, synchronizable: true)
+            KeychainItemCRUD.delete(account: icloudSyncAccount, synchronizable: true)
             return nil
         }
     }
 
     /// True when an iCloud-synced passphrase item exists.
     static func iCloudSyncEnabled() -> Bool {
-        var query = baseQuery(account: icloudSyncAccount, synchronizable: true)
-        query[kSecReturnData as String] = false
-        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIAllow
-        return SecItemCopyMatching(query as CFDictionary, nil) != errSecItemNotFound
-    }
-
-    // MARK: - Internals
-
-    /// Internal store with explicit `synchronizable` flag. Mirrors the
-    /// private `store(...)` in the base file but exposes the flag so
-    /// this extension can write to iCloud Keychain.
-    private static func store(
-        _ passphrase: String,
-        account: String,
-        accessControl: SecAccessControl?,
-        synchronizable: Bool
-    ) throws {
-        delete(account: account, synchronizable: synchronizable)
-        var attributes: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: Data(passphrase.utf8),
-            kSecAttrSynchronizable as String: synchronizable ? kCFBooleanTrue : kCFBooleanFalse,
-        ]
-        if let accessControl {
-            attributes[kSecAttrAccessControl as String] = accessControl
-        } else {
-            attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        let result = KeychainItemCRUD.read(
+            account: icloudSyncAccount,
+            allowingAuthenticationUI: false,
+            synchronizable: true
+        )
+        // A `failed` read means the item exists but is gated by its
+        // access control (errSecInteractionNotAllowed); treat that as
+        // "exists" so the UI reports sync as enabled.
+        switch result {
+        case .found, .failed:
+            return true
+        case .notFound:
+            return false
         }
-        let status = SecItemAdd(attributes as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.unhandled(status: status)
-        }
-    }
-
-    private static func baseQuery(account: String, synchronizable: Bool) -> [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecAttrSynchronizable as String: synchronizable ? kCFBooleanTrue : kCFBooleanFalse,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-    }
-
-    private static func delete(account: String, synchronizable: Bool) {
-        let query = baseQuery(account: account, synchronizable: synchronizable)
-        SecItemDelete(query as CFDictionary)
     }
 }
