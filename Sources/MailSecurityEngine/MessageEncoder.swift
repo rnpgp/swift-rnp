@@ -42,102 +42,47 @@ extension MailSecurityEngine {
         recipients: [RnpKey],
         rnp: Rnp
     ) throws -> EncodedMessage {
-        let parsed = MimeMessage.parse(request.message)
-        let eol: EndOfLine = .crlf
-
-        var topHeaders: [MimeMessage.Header] = []
-        var contentHeaders: [MimeMessage.Header] = []
-        for header in parsed.headers {
-            if header.name.lowercased().hasPrefix("content-") {
-                contentHeaders.append(header)
-            } else {
-                topHeaders.append(header)
-            }
-        }
-        if contentHeaders.isEmpty {
-            contentHeaders = [MimeMessage.Header(
-                name: "Content-Type",
-                value: "text/plain; charset=\"utf-8\""
-            )]
-        }
-        if !topHeaders.contains(where: { $0.name.caseInsensitiveCompare("MIME-Version") == .orderedSame }) {
-            topHeaders.append(MimeMessage.Header(name: "MIME-Version", value: "1.0"))
-        }
-
-        // The MIME entity being protected.
-        var entity = Data()
-        for header in contentHeaders {
-            entity.append(Data("\(header.name): \(header.value)".utf8))
-            entity.append(eol.data)
-        }
-        entity.append(eol.data)
-        entity.append(parsed.body)
-
-        let boundary = makeBoundary(avoiding: entity)
+        let parsed = parseMessageEntity(request.message)
 
         var body = Data()
         let topLevelType: MimeMessage.Header
+        var topHeaders = parsed.topHeaders
         if request.encrypt {
-            // Protected headers ("Memory Hole", protected-headers="v1" as
-            // produced by K-9 Mail and Thunderbird): the sensitive envelope
-            // headers move into the encrypted payload, and the outer Subject
-            // is hidden behind a generic placeholder.
-            let protected = topHeaders.filter {
-                ProtectedHeaders.names.contains($0.name.lowercased())
-            }
-            var plaintext = entity
-            if !protected.isEmpty {
-                plaintext = protectedHeadersEntity(protected: protected, entity: entity, eol: eol)
-                if let index = topHeaders.firstIndex(where: {
-                    $0.name.caseInsensitiveCompare("Subject") == .orderedSame
-                }) {
-                    topHeaders[index] = MimeMessage.Header(
-                        name: topHeaders[index].name,
-                        value: ProtectedHeaders.placeholderSubject
-                    )
-                }
-            }
-            // Sign inside the encryption envelope: only the recipient can
-            // both read and verify the message.
-            if request.sign, let signer {
-                plaintext = try rnp.sign(plaintext, with: signer, armored: false)
-            }
-            let ciphertext = try rnp.encrypt(plaintext, for: recipients, armored: true)
-            appendLine("--\(boundary)", to: &body, eol: eol)
-            appendLine("Content-Type: application/pgp-encrypted", to: &body, eol: eol)
-            appendLine("", to: &body, eol: eol)
-            appendLine("Version: 1", to: &body, eol: eol)
-            appendLine("", to: &body, eol: eol)
-            appendLine("--\(boundary)", to: &body, eol: eol)
-            appendLine("Content-Type: application/octet-stream; name=\"encrypted.asc\"", to: &body, eol: eol)
-            appendLine("Content-Description: OpenPGP encrypted message", to: &body, eol: eol)
-            appendLine("Content-Disposition: inline; filename=\"encrypted.asc\"", to: &body, eol: eol)
-            appendLine("", to: &body, eol: eol)
-            body.append(ciphertext)
-            appendPartEndOfLine(&body, eol: eol)
-            appendLine("--\(boundary)--", to: &body, eol: eol)
-            var mediaType = "multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"\(boundary)\""
-            if !protected.isEmpty {
-                mediaType += "; protected-headers=\"v1\""
-            }
-            topLevelType = MimeMessage.Header(name: "Content-Type", value: mediaType)
+            let plaintext = try buildEncryptionPlaintext(
+                entity: parsed.entity,
+                topHeaders: topHeaders,
+                request: request,
+                signer: signer,
+                rnp: rnp,
+                eol: parsed.eol
+            )
+            topHeaders = plaintext.topHeaders
+            let ciphertext = try rnp.encrypt(plaintext.data, for: recipients, armored: true)
+            let (encryptedBody, mediaHeader) = wrapEncryptedBody(
+                ciphertext: ciphertext,
+                boundary: parsed.boundary,
+                hasProtected: plaintext.hasProtected,
+                eol: parsed.eol
+            )
+            body = encryptedBody
+            topLevelType = mediaHeader
         } else if request.sign, let signer {
-            let signedEntity = MimeMessage.crlfNormalized(entity)
+            let signedEntity = MimeMessage.crlfNormalized(parsed.entity)
             let signature = try rnp.signDetached(signedEntity, with: signer, armored: true)
-            appendLine("--\(boundary)", to: &body, eol: eol)
+            appendLine("--\(parsed.boundary)", to: &body, eol: parsed.eol)
             body.append(signedEntity)
-            appendPartEndOfLine(&body, eol: eol)
-            appendLine("--\(boundary)", to: &body, eol: eol)
-            appendLine("Content-Type: application/pgp-signature; name=\"signature.asc\"", to: &body, eol: eol)
-            appendLine("Content-Description: OpenPGP digital signature", to: &body, eol: eol)
-            appendLine("Content-Disposition: attachment; filename=\"signature.asc\"", to: &body, eol: eol)
-            appendLine("", to: &body, eol: eol)
+            appendPartEndOfLine(&body, eol: parsed.eol)
+            appendLine("--\(parsed.boundary)", to: &body, eol: parsed.eol)
+            appendLine("Content-Type: application/pgp-signature; name=\"signature.asc\"", to: &body, eol: parsed.eol)
+            appendLine("Content-Description: OpenPGP digital signature", to: &body, eol: parsed.eol)
+            appendLine("Content-Disposition: attachment; filename=\"signature.asc\"", to: &body, eol: parsed.eol)
+            appendLine("", to: &body, eol: parsed.eol)
             body.append(signature)
-            appendPartEndOfLine(&body, eol: eol)
-            appendLine("--\(boundary)--", to: &body, eol: eol)
+            appendPartEndOfLine(&body, eol: parsed.eol)
+            appendLine("--\(parsed.boundary)--", to: &body, eol: parsed.eol)
             topLevelType = MimeMessage.Header(
                 name: "Content-Type",
-                value: "multipart/signed; micalg=\"pgp-sha256\"; protocol=\"application/pgp-signature\"; boundary=\"\(boundary)\""
+                value: "multipart/signed; micalg=\"pgp-sha256\"; protocol=\"application/pgp-signature\"; boundary=\"\(parsed.boundary)\""
             )
         } else {
             // Unreachable: encode() rejects requests with both flags off and
@@ -146,7 +91,7 @@ extension MailSecurityEngine {
         }
 
         return EncodedMessage(
-            rawData: serialize(headers: topHeaders + [topLevelType], body: body, eol: eol),
+            rawData: serialize(headers: topHeaders + [topLevelType], body: body, eol: parsed.eol),
             isSigned: request.sign,
             isEncrypted: request.encrypt
         )
@@ -190,6 +135,130 @@ extension MailSecurityEngine {
     }
 
     // MARK: - Building blocks
+
+    /// Parsed-and-prepared MIME entity, ready to be either signed-only or
+    /// fed to `buildEncryptionPlaintext` for encryption.
+    struct ParsedMessageEntity {
+        let topHeaders: [MimeMessage.Header]
+        let entity: Data
+        let boundary: String
+        let eol: EndOfLine
+    }
+
+    /// Splits the raw RFC 822 message into top-level envelope headers
+    /// (From/To/Subject/MIME-Version/etc.) and the MIME entity that will
+    /// be protected (Content-* headers + body). Ensures a Content-Type
+    /// and MIME-Version exist. Picks a boundary that does not collide
+    /// with the entity. Shared by the base and AEAD encoder paths so
+    /// they cannot drift on header-splitting rules.
+    func parseMessageEntity(_ message: Data) -> ParsedMessageEntity {
+        let parsed = MimeMessage.parse(message)
+        let eol: EndOfLine = .crlf
+
+        var topHeaders: [MimeMessage.Header] = []
+        var contentHeaders: [MimeMessage.Header] = []
+        for header in parsed.headers {
+            if header.name.lowercased().hasPrefix("content-") {
+                contentHeaders.append(header)
+            } else {
+                topHeaders.append(header)
+            }
+        }
+        if contentHeaders.isEmpty {
+            contentHeaders = [MimeMessage.Header(
+                name: "Content-Type",
+                value: "text/plain; charset=\"utf-8\""
+            )]
+        }
+        if !topHeaders.contains(where: { $0.name.caseInsensitiveCompare("MIME-Version") == .orderedSame }) {
+            topHeaders.append(MimeMessage.Header(name: "MIME-Version", value: "1.0"))
+        }
+
+        var entity = Data()
+        for header in contentHeaders {
+            entity.append(Data("\(header.name): \(header.value)".utf8))
+            entity.append(eol.data)
+        }
+        entity.append(eol.data)
+        entity.append(parsed.body)
+
+        let boundary = makeBoundary(avoiding: entity)
+        return ParsedMessageEntity(topHeaders: topHeaders, entity: entity, boundary: boundary, eol: eol)
+    }
+
+    /// The signed plaintext (and updated outer headers) that gets handed
+    /// to `rnp.encrypt`. Shared by the base encoder and the AEAD overload
+    /// so both produce byte-identical plaintext for the same input —
+    /// previously the AEAD path re-derived this independently and could
+    /// drift.
+    struct EncryptionPlaintext {
+        let data: Data
+        let topHeaders: [MimeMessage.Header]
+        let hasProtected: Bool
+    }
+
+    func buildEncryptionPlaintext(
+        entity: Data,
+        topHeaders: [MimeMessage.Header],
+        request: EncodingRequest,
+        signer: RnpKey?,
+        rnp: Rnp,
+        eol: EndOfLine
+    ) throws -> EncryptionPlaintext {
+        var topHeaders = topHeaders
+        let protected = topHeaders.filter {
+            ProtectedHeaders.names.contains($0.name.lowercased())
+        }
+        var plaintext = entity
+        var hasProtected = false
+        if !protected.isEmpty {
+            hasProtected = true
+            plaintext = protectedHeadersEntity(protected: protected, entity: entity, eol: eol)
+            if let index = topHeaders.firstIndex(where: {
+                $0.name.caseInsensitiveCompare("Subject") == .orderedSame
+            }) {
+                topHeaders[index] = MimeMessage.Header(
+                    name: topHeaders[index].name,
+                    value: ProtectedHeaders.placeholderSubject
+                )
+            }
+        }
+        if request.sign, let signer {
+            plaintext = try rnp.sign(plaintext, with: signer, armored: false)
+        }
+        return EncryptionPlaintext(data: plaintext, topHeaders: topHeaders, hasProtected: hasProtected)
+    }
+
+    /// Wraps an ASCII-armored PGP ciphertext in the multipart/encrypted
+    /// structure (RFC 3156 §4). The same wrapper is used by the base
+    /// encoder and the AEAD overload — the only thing that differs
+    /// between them is the ciphertext bytes.
+    func wrapEncryptedBody(
+        ciphertext: Data,
+        boundary: String,
+        hasProtected: Bool,
+        eol: EndOfLine
+    ) -> (body: Data, topLevelType: MimeMessage.Header) {
+        var body = Data()
+        appendLine("--\(boundary)", to: &body, eol: eol)
+        appendLine("Content-Type: application/pgp-encrypted", to: &body, eol: eol)
+        appendLine("", to: &body, eol: eol)
+        appendLine("Version: 1", to: &body, eol: eol)
+        appendLine("", to: &body, eol: eol)
+        appendLine("--\(boundary)", to: &body, eol: eol)
+        appendLine("Content-Type: application/octet-stream; name=\"encrypted.asc\"", to: &body, eol: eol)
+        appendLine("Content-Description: OpenPGP encrypted message", to: &body, eol: eol)
+        appendLine("Content-Disposition: inline; filename=\"encrypted.asc\"", to: &body, eol: eol)
+        appendLine("", to: &body, eol: eol)
+        body.append(ciphertext)
+        appendPartEndOfLine(&body, eol: eol)
+        appendLine("--\(boundary)--", to: &body, eol: eol)
+        var mediaType = "multipart/encrypted; protocol=\"application/pgp-encrypted\"; boundary=\"\(boundary)\""
+        if hasProtected {
+            mediaType += "; protected-headers=\"v1\""
+        }
+        return (body, MimeMessage.Header(name: "Content-Type", value: mediaType))
+    }
 
     /// Wraps the MIME entity being encrypted together with the protected
     /// envelope headers, K-9/Thunderbird style: a `multipart/mixed` whose

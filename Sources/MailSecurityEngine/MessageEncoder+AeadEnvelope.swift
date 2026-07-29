@@ -65,9 +65,11 @@ public extension MailSecurityEngine {
     /// Used by callers that have already decided on the envelope (e.g.
     /// always-AEAD for a power user; legacy for backward compat).
     ///
-    /// The base encoder is called first; its encrypt output is then
-    /// replaced by a new encrypt using the chosen envelope. The MIME
-    /// wrapping, protected headers, and signing are unchanged.
+    /// Shares `parseMessageEntity`, `buildEncryptionPlaintext`, and
+    /// `wrapEncryptedBody` with the base encoder so the MIME wrapping,
+    /// protected-headers handling, and signing steps cannot drift between
+    /// the two paths. Only the `rnp.encrypt` call differs (custom AEAD
+    /// and PKESK version).
     func encodePGPMime(
         _ request: EncodingRequest,
         signer: RnpKey?,
@@ -75,70 +77,35 @@ public extension MailSecurityEngine {
         rnp: Rnp,
         envelope: EncryptEnvelopeParameters
     ) throws -> EncodedMessage {
-        let legacyEncoded = try encodePGPMime(request, signer: signer, recipients: recipients, rnp: rnp)
+        guard request.encrypt else {
+            return try encodePGPMime(request, signer: signer, recipients: recipients, rnp: rnp)
+        }
 
-        guard request.encrypt else { return legacyEncoded }
-
-        // Re-derive the plaintext the base encoder produced by
-        // replaying the same header splitting + signing steps.
-        let parsed = MimeMessage.parse(request.message)
-        var contentHeaders: [MimeMessage.Header] = []
-        for header in parsed.headers where header.name.lowercased().hasPrefix("content-") {
-            contentHeaders.append(header)
-        }
-        if contentHeaders.isEmpty {
-            contentHeaders = [MimeMessage.Header(
-                name: "Content-Type",
-                value: "text/plain; charset=\"utf-8\""
-            )]
-        }
-        var entity = Data()
-        let eol: EndOfLine = .crlf
-        for header in contentHeaders {
-            entity.append(Data("\(header.name): \(header.value)".utf8))
-            entity.append(eol.data)
-        }
-        entity.append(eol.data)
-        entity.append(parsed.body)
-        var plaintext = entity
-        if request.sign, let signer {
-            plaintext = try rnp.sign(plaintext, with: signer, armored: false)
-        }
+        let parsed = parseMessageEntity(request.message)
+        let plaintext = try buildEncryptionPlaintext(
+            entity: parsed.entity,
+            topHeaders: parsed.topHeaders,
+            request: request,
+            signer: signer,
+            rnp: rnp,
+            eol: parsed.eol
+        )
         let ciphertext = try rnp.encrypt(
-            plaintext,
+            plaintext.data,
             for: recipients,
             aead: envelope.aead,
             pkeskVersion: envelope.pkeskVersion,
             armored: true
         )
-
-        // Splice the new ciphertext into the encoded message in place
-        // of the original ASCII-armored PGP MESSAGE block.
-        var data = legacyEncoded.rawData
-        let beginMarker = Data("-----BEGIN PGP MESSAGE-----".utf8)
-        let endMarker = Data("-----END PGP MESSAGE-----".utf8)
-        guard let beginRange = data.range(of: beginMarker),
-              let endRange = data.range(of: endMarker, in: beginRange.upperBound..<data.endIndex)
-        else {
-            return legacyEncoded
-        }
-        var replaceEnd = endRange.upperBound
-        if replaceEnd + 1 < data.count, data[replaceEnd] == 0x0A {
-            replaceEnd += 1
-        } else if replaceEnd + 2 <= data.count,
-                  data[replaceEnd] == 0x0D,
-                  data[replaceEnd + 1] == 0x0A {
-            replaceEnd += 2
-        }
-        var result = Data()
-        result.append(data.subdata(in: 0..<beginRange.lowerBound))
-        result.append(ciphertext)
-        result.append(Data("\r\n".utf8))
-        result.append(data.subdata(in: replaceEnd..<data.count))
-        data = result
+        let (body, topLevelType) = wrapEncryptedBody(
+            ciphertext: ciphertext,
+            boundary: parsed.boundary,
+            hasProtected: plaintext.hasProtected,
+            eol: parsed.eol
+        )
         return EncodedMessage(
-            rawData: data,
-            isSigned: legacyEncoded.isSigned,
+            rawData: serialize(headers: plaintext.topHeaders + [topLevelType], body: body, eol: parsed.eol),
+            isSigned: request.sign,
             isEncrypted: true
         )
     }
