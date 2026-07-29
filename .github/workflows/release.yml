@@ -1,6 +1,12 @@
 name: release
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.2.3 (with or without leading v)'
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
@@ -8,62 +14,57 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  validate-tag:
+  release:
+    # When the workflow_dispatch path pushes the tag, the resulting tag-push
+    # event re-triggers this workflow. Skip that second run — the first run is
+    # already creating the release.
+    if: github.event_name == 'workflow_dispatch' || github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout swift-rnp
-      uses: actions/checkout@v7
+      - name: Checkout
+        uses: actions/checkout@v7
 
-    - name: Validate tag matches package version
-      run: |
-        TAG="${GITHUB_REF_NAME}"  # e.g. v0.2.0
-        if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-          echo "Tag '$TAG' is not a vX.Y.Z semver"
-          exit 1
-        fi
-        PKG_VERSION="$(awk -F'"' '/^let version =/ { print $2 }' Package.swift)"
-        if [[ "$TAG" != "v$PKG_VERSION" ]]; then
-          echo "Tag is v$PKG_VERSION in Package.swift, but git tag is $TAG"
-          exit 1
-        fi
-        echo "Tag $TAG matches Package.swift version"
-
-    - name: Run full test matrix
-      uses: actions/checkout@v7
-
-    - name: Run release tests
-      run: |
-        # Just verify the tag-versioned build works against librnp tag
-        echo "Tag $GITHUB_REF_NAME is ready for release"
-
-  create-release:
-    needs: validate-tag
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout swift-rnp
-      uses: actions/checkout@v7
-
-    - name: Read changelog
-      run: |
-        if [[ -f CHANGELOG.md ]]; then
-          awk -v tag="$GITHUB_REF_NAME" '
-            /^## / { if (found) exit; if ($2 == tag) { found=1 } }
-            found { print }
-          ' CHANGELOG.md > release-notes.md
-          if [[ -s release-notes.md ]]; then
-            echo "release-notes.md contents:"
-            cat release-notes.md
+      - name: Resolve and validate version
+        id: ver
+        run: |
+          if [[ -n "${{ github.event.inputs.version }}" ]]; then
+            v="${{ github.event.inputs.version }}"
+            v="${v#v}"
           else
-            echo "No changelog entry for $GITHUB_REF_NAME"
-            echo "- swift-rnp $GITHUB_REF_NAME" > release-notes.md
+            v="${GITHUB_REF_NAME#v}"
           fi
-        else
-          echo "- swift-rnp $GITHUB_REF_NAME" > release-notes.md
-        fi
+          if ! [[ "${v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: '${v}' is not a valid x.y.z SemVer" >&2
+            exit 1
+          fi
+          echo "version=${v}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${v}"     >> "$GITHUB_OUTPUT"
 
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v3
-      with:
-        body_path: release-notes.md
-        draft: true
+      - name: Refuse to re-tag an existing version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if git ls-remote --tags origin "refs/tags/${{ steps.ver.outputs.tag }}" | grep -q .; then
+            echo "ERROR: tag ${{ steps.ver.outputs.tag }} already exists" >&2
+            exit 1
+          fi
+
+      - name: Create and push tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.tag }}" -m "swift-rnp ${{ steps.ver.outputs.tag }}"
+          git push origin "${{ steps.ver.outputs.tag }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
