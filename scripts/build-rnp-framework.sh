@@ -76,6 +76,7 @@ framework module RNPFramework {
 EOF
 
     cat > "${VERSIONS}/Headers/RNPFramework.h" <<EOF
+#import <assert.h>
 #import "rnp/rnp.h"
 #import "rnp/rnp_err.h"
 #import "rnp/rnp_export.h"
@@ -399,6 +400,7 @@ framework module RNPFramework {
 EOF
 
 cat > "${VERSIONS}/Headers/RNPFramework.h" <<EOF
+#import <assert.h>
 #import "rnp/rnp.h"
 #import "rnp/rnp_err.h"
 #import "rnp/rnp_export.h"
