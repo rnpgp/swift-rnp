@@ -61,6 +61,13 @@ if [[ -n "${USE_PREFIX}" ]]; then
     mkdir -p "${VERSIONS}/Headers/rnp" "${VERSIONS}/Modules" "${VERSIONS}/Resources"
     cp "${HEADERS_DIR}/rnp"/*.h "${VERSIONS}/Headers/rnp/"
 
+    # rnp's own headers do `#include <rnp/XXX.h>` internally. Those angled
+    # includes can't resolve when this framework is imported as a binary
+    # target (no -I points at our Headers/). Rewrite them to quoted includes
+    # so they resolve relative to the headers' own directory.
+    sed -i.bak -E 's/#(include|import) <rnp\/([^>]+)>/#\1 "\2"/g' "${VERSIONS}/Headers/rnp/"*.h
+    rm -f "${VERSIONS}/Headers/rnp/"*.h.bak
+
     cat > "${VERSIONS}/Modules/module.modulemap" <<EOF
 framework module RNPFramework {
     umbrella header "RNPFramework.h"
@@ -69,10 +76,10 @@ framework module RNPFramework {
 EOF
 
     cat > "${VERSIONS}/Headers/RNPFramework.h" <<EOF
-#import <rnp/rnp.h>
-#import <rnp/rnp_err.h>
-#import <rnp/rnp_export.h>
-#import <rnp/rnp_ver.h>
+#import "rnp/rnp.h"
+#import "rnp/rnp_err.h"
+#import "rnp/rnp_export.h"
+#import "rnp/rnp_ver.h"
 EOF
 
     # Minimal Info.plist
@@ -377,6 +384,13 @@ VERSIONS="${FW_DIR}/Versions/A"
 mkdir -p "${VERSIONS}/Headers/rnp" "${VERSIONS}/Modules" "${VERSIONS}/Resources"
 cp "${HEADERS_DIR}/rnp"/*.h "${VERSIONS}/Headers/rnp/"
 
+# rnp's own headers do `#include <rnp/XXX.h>` internally. Those angled
+# includes can't resolve when this framework is imported as a binary
+# target (no -I points at our Headers/). Rewrite them to quoted includes
+# so they resolve relative to the headers' own directory.
+sed -i.bak -E 's/#(include|import) <rnp\/([^>]+)>/#\1 "\2"/g' "${VERSIONS}/Headers/rnp/"*.h
+rm -f "${VERSIONS}/Headers/rnp/"*.h.bak
+
 cat > "${VERSIONS}/Modules/module.modulemap" <<EOF
 framework module RNPFramework {
     umbrella header "RNPFramework.h"
@@ -385,10 +399,10 @@ framework module RNPFramework {
 EOF
 
 cat > "${VERSIONS}/Headers/RNPFramework.h" <<EOF
-#import <rnp/rnp.h>
-#import <rnp/rnp_err.h>
-#import <rnp/rnp_export.h>
-#import <rnp/rnp_ver.h>
+#import "rnp/rnp.h"
+#import "rnp/rnp_err.h"
+#import "rnp/rnp_export.h"
+#import "rnp/rnp_ver.h"
 EOF
 
 cat > "${VERSIONS}/Resources/Info.plist" <<EOF
