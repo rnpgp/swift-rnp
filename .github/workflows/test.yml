@@ -33,6 +33,9 @@ jobs:
         rnp: ${{ fromJson(needs.prepare.outputs.matrix) }}
     runs-on: macos-14
     steps:
+    - name: Drop untrusted preinstalled taps
+      run: brew untap aws/tap 2>/dev/null || true
+
     - name: Install librnp build deps
       run: brew install openssl@3 json-c cmake pkg-config
 
@@ -70,7 +73,8 @@ jobs:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
 
     - name: Run RnpDemo smoke test
-      continue-on-error: true      run: swift run RnpDemo
+      continue-on-error: true
+      run: swift run RnpDemo
       env:
         PKG_CONFIG_PATH: /usr/local/lib/pkgconfig
 

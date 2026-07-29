@@ -24,6 +24,9 @@ jobs:
     - name: Checkout swift-rnp
       uses: actions/checkout@v7
 
+    - name: Drop untrusted preinstalled taps
+      run: brew untap aws/tap 2>/dev/null || true
+
     - name: Install OpenSSL + cmake
       run: brew install openssl@3 json-c cmake pkg-config
 
