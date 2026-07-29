@@ -43,6 +43,10 @@ let package = Package(
             dependencies: []
         ),
         .target(
+            name: "KeyringStore",
+            dependencies: ["Rnp", "TrustStore", "KeyStateStore"]
+        ),
+        .target(
             name: "Autocrypt",
             dependencies: []
         ),
@@ -52,11 +56,11 @@ let package = Package(
         ),
         .target(
             name: "MailSecurityEngine",
-            dependencies: ["Rnp", "KeyServerClient", "TrustStore", "KeyStateStore", "Autocrypt", "PostQuantum"]
+            dependencies: ["Rnp", "KeyringStore", "KeyServerClient", "TrustStore", "KeyStateStore", "Autocrypt", "PostQuantum", "KeyLifecycle"]
         ),
         .target(
             name: "KeyLifecycle",
-            dependencies: ["Rnp", "MailSecurityEngine"]
+            dependencies: ["Rnp", "KeyringStore"]
         ),
         .target(
             name: "RnpMailUI",

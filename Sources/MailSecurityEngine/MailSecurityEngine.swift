@@ -13,6 +13,7 @@
 
 import Autocrypt
 import Foundation
+@_exported import KeyringStore
 import Rnp
 import TrustStore
 

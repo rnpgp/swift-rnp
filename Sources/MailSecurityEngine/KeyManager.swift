@@ -24,6 +24,7 @@
 //
 
 import Foundation
+import KeyringStore
 import KeyStateStore
 import Rnp
 import TrustStore

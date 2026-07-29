@@ -3,12 +3,11 @@
 //  swift-rnp
 //
 //  High-level key lifecycle operations: rotation, expiry extension, and
-//  revocation. Built on top of MailSecurityEngine.KeyManager and the Rnp
-//  wrapper.
+//  revocation. Built on top of KeyringStore and the Rnp wrapper.
 //
 
 import Foundation
-import MailSecurityEngine
+import KeyringStore
 import Rnp
 
 /// Summary returned after a subkey rotation.
@@ -108,10 +107,10 @@ extension KeyLifecycleError: LocalizedError {
 
 /// High-level key lifecycle operations.
 public final class KeyLifecycle {
-    private let keyManager: KeyManager
+    private let keyringStore: KeyringStore
 
-    public init(keyManager: KeyManager) {
-        self.keyManager = keyManager
+    public init(keyringStore: KeyringStore) {
+        self.keyringStore = keyringStore
     }
 
     // MARK: - Rotation
@@ -133,7 +132,7 @@ public final class KeyLifecycle {
     }
 
     private func rotateSubkey(for fingerprint: String, usage: String) throws -> RotationSummary {
-        try keyManager.withRnp { rnp in
+        try keyringStore.withRnp { rnp in
             let primary = try rnp.requireKey(fingerprint, type: .fingerprint)
             let primaryFPR = try primary.fingerprint
             let primaryAlg = try primary.algorithm
@@ -174,7 +173,7 @@ public final class KeyLifecycle {
                 retiredFPR = try old.fingerprint
             }
 
-            try keyManager.save()
+            try keyringStore.save()
 
             let message = usage == "encrypt"
                 ? "A new encryption subkey was generated. Old messages remain decryptable for 30 days."
@@ -203,7 +202,7 @@ public final class KeyLifecycle {
             throw KeyLifecycleError.invalidExpiryDate
         }
 
-        try keyManager.withRnp { rnp in
+        try keyringStore.withRnp { rnp in
             let key = try rnp.requireKey(fingerprint, type: .fingerprint)
             let creation = try key.creationDate
             let expirySeconds = UInt32(max(0, newDate.timeIntervalSince1970 - creation.timeIntervalSince1970))
@@ -213,7 +212,7 @@ public final class KeyLifecycle {
                 let subkeyExpirySeconds = UInt32(max(0, newDate.timeIntervalSince1970 - subkeyCreation.timeIntervalSince1970))
                 try subkey.setExpirationSeconds(subkeyExpirySeconds)
             }
-            try keyManager.save()
+            try keyringStore.save()
         }
     }
 
@@ -225,11 +224,11 @@ public final class KeyLifecycle {
         code: RevocationCode = .noReason,
         reason: String = ""
     ) throws -> Data {
-        try keyManager.withRnp { rnp in
+        try keyringStore.withRnp { rnp in
             let key = try rnp.requireKey(fingerprint, type: .fingerprint)
             try key.revoke(code: code, reason: reason)
             let certificate = try key.exportRevocation()
-            try keyManager.save()
+            try keyringStore.save()
             return certificate
         }
     }
@@ -243,7 +242,7 @@ public final class KeyLifecycle {
         let now = Date()
         var items: [KeyExpiryItem] = []
 
-        for key in try keyManager.listKeys() {
+        for key in try keyringStore.listKeys() {
             let userID = key.primaryUserID
             if let expiration = key.expirationDate,
                expiration < now.addingTimeInterval(threshold) {
@@ -256,7 +255,7 @@ public final class KeyLifecycle {
                 ))
             }
 
-            let subkeys = try keyManager.subkeys(for: key.fingerprint)
+            let subkeys = try keyringStore.subkeys(for: key.fingerprint)
             for subkey in subkeys {
                 if let expiration = subkey.expirationDate,
                    expiration < now.addingTimeInterval(threshold) {

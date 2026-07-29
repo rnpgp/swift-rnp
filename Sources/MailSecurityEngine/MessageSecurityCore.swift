@@ -8,6 +8,8 @@
 //
 
 import Foundation
+import KeyLifecycle
+import KeyringStore
 import Rnp
 import TrustStore
 
@@ -258,29 +260,27 @@ public final class MessageSecurityCore {
     /// only fails with `RecipientKeyUpdateError.keyNotOwned`; the remedy for
     /// those is `fetchRecipientKey(for:)`. The primary key and all its
     /// subkeys are extended, so an expired encryption subkey is rescued too.
-    /// Duplicates `KeyLifecycle.extendExpiry`, which this module cannot
-    /// import (KeyLifecycle depends on MailSecurityEngine, not vice versa).
+    ///
+    /// The actual expiry-setting and keyring-save is delegated to
+    /// `KeyLifecycle.extendExpiry`; this method handles the email lookup
+    /// and ownership check that are specific to the recipient-key UX.
     public func extendRecipientKeyExpiry(for email: String, to newDate: Date) throws {
         guard newDate > Date() else {
             throw RecipientKeyUpdateError.invalidExpiryDate
         }
-        try engine.keyManager.withRnp { rnp in
+        let fingerprint = try engine.keyManager.withRnp { rnp -> String in
             guard let key = try engine.keyManager.publicKeyUnlocked(for: email, rnp: rnp) else {
                 throw RecipientKeyUpdateError.keyNotFound(email)
             }
             guard (try? key.hasSecret) ?? false else {
                 throw RecipientKeyUpdateError.keyNotOwned(email)
             }
-            let creation = try key.creationDate
-            let expirySeconds = UInt32(max(0, newDate.timeIntervalSince1970 - creation.timeIntervalSince1970))
-            try key.setExpirationSeconds(expirySeconds)
-            for subkey in try key.subkeys {
-                let subkeyCreation = try subkey.creationDate
-                let subkeyExpirySeconds = UInt32(max(0, newDate.timeIntervalSince1970 - subkeyCreation.timeIntervalSince1970))
-                try subkey.setExpirationSeconds(subkeyExpirySeconds)
-            }
+            return try key.fingerprint
         }
-        try engine.keyManager.save()
+        try KeyLifecycle(keyringStore: engine.keyManager.keyringStore).extendExpiry(
+            for: fingerprint,
+            newDate: newDate
+        )
     }
 
     // MARK: - Signer key fetch

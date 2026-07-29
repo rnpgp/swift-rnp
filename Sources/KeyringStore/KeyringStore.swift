@@ -616,7 +616,7 @@ public final class KeyringStore {
 
     /// Case-insensitive equality of two address identifiers, comparing the
     /// email addresses extracted from user-ID form when present.
-    static func addressesMatch(_ lhs: String, _ rhs: String) -> Bool {
+    public static func addressesMatch(_ lhs: String, _ rhs: String) -> Bool {
         let left = emailAddress(from: lhs) ?? lhs
         let right = emailAddress(from: rhs) ?? rhs
         return left.caseInsensitiveCompare(right) == .orderedSame

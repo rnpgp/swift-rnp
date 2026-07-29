@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import KeyringStore
 import Rnp
 
 /// Errors thrown by `PaperKeyRestoreService`.
