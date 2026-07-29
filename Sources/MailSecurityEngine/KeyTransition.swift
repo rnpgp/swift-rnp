@@ -1,6 +1,6 @@
 //
 //  KeyTransition.swift
-//  KeyLifecycle
+//  MailSecurityEngine
 //
 //  Orchestrates the multi-step key transition flow described in
 //  TODO.roadmap/05-key-transition-wizard.md. Each step is a discrete
@@ -8,7 +8,7 @@
 //  a thin sequence over the steps.
 //
 //  The engine layer focuses on the cryptographic actions:
-//    1. Generate new key (delegated to `KeyManager`).
+//    1. Generate new key (delegated to `KeyringStore`).
 //    2. Copy old UID(s) onto new key.
 //    3. Sign new key's UID(s) with old key (transition certification).
 //    4. Revoke old key with reason `superseded` pointing at new key.
@@ -17,9 +17,15 @@
 //  Publish and notify-contacts are caller responsibilities (they touch
 //  the network and the user's address book, not the crypto).
 //
+//  This type lives in MailSecurityEngine (rather than the KeyLifecycle
+//  target) because it depends on `OfflinePublishQueue`, which is itself
+//  a MailSecurityEngine concern. The pure key-lifecycle operations
+//  (rotation, expiry extension, revocation) live in the KeyLifecycle
+//  target and depend only on KeyringStore + Rnp.
+//
 
 import Foundation
-import MailSecurityEngine
+import KeyringStore
 import Rnp
 
 /// Snapshot of a completed transition. Returned by `KeyTransition.run`
@@ -41,14 +47,14 @@ public enum KeyTransitionError: Error, Equatable {
 
 /// Engine-layer orchestrator for key transitions.
 public final class KeyTransition {
-    private let keyManager: KeyManager
+    private let keyringStore: KeyringStore
     private let publishQueue: OfflinePublishQueue?
     private let publishAction: ((QueuedPublishAction) async throws -> Void)?
 
     /// Creates a transition orchestrator.
     ///
     /// - Parameters:
-    ///   - keyManager: engine key manager.
+    ///   - keyringStore: engine keyring store.
     ///   - publishQueue: optional offline-publish queue. When supplied,
     ///     the orchestrator enqueues publish actions for the new and
     ///     revoked-old keys instead of attempting them inline. The
@@ -57,13 +63,28 @@ public final class KeyTransition {
     ///     this and `publishQueue` are nil, publish is the caller's
     ///     responsibility.
     public init(
+        keyringStore: KeyringStore,
+        publishQueue: OfflinePublishQueue? = nil,
+        publishAction: ((QueuedPublishAction) async throws -> Void)? = nil
+    ) {
+        self.keyringStore = keyringStore
+        self.publishQueue = publishQueue
+        self.publishAction = publishAction
+    }
+
+    /// Backwards-compat initializer accepting a deprecated `KeyManager`
+    /// façade. Extracts the underlying `keyringStore` and delegates.
+    @available(*, deprecated, message: "Use init(keyringStore:publishQueue:publishAction:)")
+    public convenience init(
         keyManager: KeyManager,
         publishQueue: OfflinePublishQueue? = nil,
         publishAction: ((QueuedPublishAction) async throws -> Void)? = nil
     ) {
-        self.keyManager = keyManager
-        self.publishQueue = publishQueue
-        self.publishAction = publishAction
+        self.init(
+            keyringStore: keyManager.keyringStore,
+            publishQueue: publishQueue,
+            publishAction: publishAction
+        )
     }
 
     /// Runs the full transition flow:
@@ -88,7 +109,7 @@ public final class KeyTransition {
         userIDsOverride: [String]? = nil,
         hash: String = "SHA256"
     ) throws -> KeyTransitionResult {
-        let userIDs: [String] = try keyManager.withRnp { rnp in
+        let userIDs: [String] = try keyringStore.withRnp { rnp in
             let old = try rnp.requireKey(oldFingerprint, type: .fingerprint)
             guard (try? old.hasSecret) == true else {
                 throw KeyTransitionError.oldKeyNotSecret
@@ -97,12 +118,12 @@ public final class KeyTransition {
         }
 
         // Step 1: generate the new key with a unique placeholder UID. We
-        // cannot use the old key's UID directly because `KeyManager.generateKey`
+        // cannot use the old key's UID directly because `KeyringStore.generateKey`
         // looks the new key up by userID, and the old key still has that
         // UID — it would return the old key's fingerprint. The real UIDs
         // are added in step 2.
         let placeholderUID = "RNP transition key \(UUID().uuidString.prefix(8))"
-        let newInfo = try keyManager.generateKey(
+        let newInfo = try keyringStore.generateKey(
             userID: placeholderUID,
             algorithm: algorithm,
             expirationSeconds: 0
@@ -112,7 +133,7 @@ public final class KeyTransition {
         // left in place — it does not affect anything and removing it
         // would require additional FFI wiring (per-UID revocation).
         for uid in userIDs {
-            _ = try? keyManager.addUserID(uid, toKeyWithFingerprint: newInfo.fingerprint)
+            _ = try? keyringStore.addUserID(uid, toKeyWithFingerprint: newInfo.fingerprint)
         }
 
         // Step 3: certify each new UID with the old key. This produces
@@ -122,7 +143,7 @@ public final class KeyTransition {
         // related to the trusted old one.
         var certificationAdded = false
         do {
-            try keyManager.withRnp { rnp in
+            try keyringStore.withRnp { rnp in
                 let old = try rnp.requireKey(oldFingerprint, type: .fingerprint)
                 let newKey = try rnp.requireKey(newInfo.fingerprint, type: .fingerprint)
                 let uidHandles = try newKey.userIDHandles
@@ -132,7 +153,7 @@ public final class KeyTransition {
                     try signature.finalize()
                 }
             }
-            try keyManager.save()
+            try keyringStore.save()
             certificationAdded = !userIDs.isEmpty
         } catch {
             throw KeyTransitionError.certificationFailed(error.localizedDescription)
@@ -140,7 +161,7 @@ public final class KeyTransition {
 
         // Step 4: revoke the old key with reason `superseded`.
         do {
-            try keyManager.withRnp { rnp in
+            try keyringStore.withRnp { rnp in
                 let old = try rnp.requireKey(oldFingerprint, type: .fingerprint)
                 try old.revoke(
                     code: .superseded,
@@ -148,13 +169,13 @@ public final class KeyTransition {
                     hash: hash
                 )
             }
-            try keyManager.save()
+            try keyringStore.save()
         } catch {
             throw KeyTransitionError.revocationFailed(error.localizedDescription)
         }
 
         // Step 5: archive the old key (decrypt-only) and clean up.
-        try keyManager.setUsageState(
+        try keyringStore.setUsageState(
             .archived,
             forFingerprint: oldFingerprint,
             reason: "auto-archived by key transition (superseded by \(newInfo.fingerprint))"
@@ -194,9 +215,9 @@ public final class KeyTransition {
     /// are surfaced via the queue's retry mechanism, not propagated.
     private func publishAfterTransition(newFingerprint: String, oldFingerprint: String) async {
         guard let publishQueue else { return }
-        let newKeyArmored = (try? keyManager.exportKey(fingerprint: newFingerprint, secret: false))
+        let newKeyArmored = (try? keyringStore.exportKey(fingerprint: newFingerprint, secret: false))
             .flatMap { String(data: $0, encoding: .ascii) } ?? ""
-        let oldKeyArmored = (try? keyManager.exportKey(fingerprint: oldFingerprint, secret: false))
+        let oldKeyArmored = (try? keyringStore.exportKey(fingerprint: oldFingerprint, secret: false))
             .flatMap { String(data: $0, encoding: .ascii) } ?? ""
         try? publishQueue.enqueue(QueuedPublishAction(
             kind: .publishKey,

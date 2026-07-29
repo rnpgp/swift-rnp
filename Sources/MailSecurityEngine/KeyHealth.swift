@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import KeyringStore
 import KeyStateStore
 
 /// Discrete health state for a single key. Surfaced in the Key Health

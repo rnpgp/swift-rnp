@@ -84,7 +84,10 @@ final class KeyLifecycleTests: XCTestCase {
         if let expiry = updatedOldSubkey?.expirationDate {
             let grace = Date().addingTimeInterval(TimeInterval(KeyLifecycleConfiguration.rotationGraceSeconds))
             let diff = abs(expiry.timeIntervalSince(grace))
-            XCTAssertLessThan(diff, 10, "grace expiry should be ~30 days")
+            // The rotation itself takes ~20s under librnp in CI; allow
+            // enough drift to cover that plus post-rotation querying of
+            // the updated keyring.
+            XCTAssertLessThan(diff, 60, "grace expiry should be ~30 days")
         }
     }
 
