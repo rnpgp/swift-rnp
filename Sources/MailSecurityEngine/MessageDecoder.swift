@@ -538,15 +538,21 @@ extension MailSecurityEngine {
     /// (preferred) or Content-Type name= parameter.
     private func attachmentFilename(_ part: MimeMessage) -> String? {
         for header in part.headers where header.name.lowercased() == "content-disposition" {
-            // filename="..." or filename=...
-            if let range = header.value.range(of: #"filename\s*=\s*"?([^";]+)"?#, options: .regularExpression) {
-                let raw = header.value[range]
-                if let eq = raw.firstIndex(of: "=") {
-                    var value = String(raw[raw.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
-                    value = value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-                    return value.isEmpty ? nil : value
-                }
+            // Manual parse: find "filename=" and grab the value (optionally quoted).
+            let value = header.value
+            guard let range = value.range(of: "filename=", options: .caseInsensitive) else {
+                continue
             }
+            var rest = value[range.upperBound...].trimmingCharacters(in: .whitespaces)
+            if rest.hasPrefix("\"") {
+                rest = String(rest.dropFirst())
+                if let endQuote = rest.firstIndex(of: "\"") {
+                    rest = String(rest[..<endQuote])
+                }
+            } else if let semi = rest.firstIndex(of: ";") {
+                rest = String(rest[..<semi]).trimmingCharacters(in: .whitespaces)
+            }
+            if !rest.isEmpty { return rest }
         }
         if let ct = part.contentType, let name = ct.parameters["name"], !name.isEmpty {
             return name
@@ -604,15 +610,25 @@ extension MailSecurityEngine {
 
     private func replaceFilename(in headers: inout [MimeMessage.Header], with newFilename: String) {
         for i in headers.indices where headers[i].name.lowercased() == "content-disposition" {
-            let regex = #"filename\s*=\s*"?[^";]+"?"#
-            if let _ = headers[i].value.range(of: regex, options: .regularExpression) {
-                headers[i].value = headers[i].value.replacingOccurrences(
-                    of: regex,
-                    with: "filename=\"\(newFilename)\"",
-                    options: .regularExpression
-                )
-                return
+            let value = headers[i].value
+            guard let range = value.range(of: "filename=", options: .caseInsensitive) else {
+                continue
             }
+            // Find the end of the old value (quote-delimited or semicolon/end).
+            var endIdx = value.endIndex
+            if value[range.upperBound...].hasPrefix("\"") {
+                let afterQuote = value.index(after: range.upperBound)
+                if let closeQuote = value[afterQuote...].firstIndex(of: "\"") {
+                    endIdx = value.index(after: closeQuote)
+                }
+            } else if let semi = value[range.upperBound...].firstIndex(of: ";") {
+                endIdx = semi
+            }
+            headers[i].value = value.replacingCharacters(
+                in: range.lowerBound..<endIdx,
+                with: "filename=\"\(newFilename)\""
+            )
+            return
         }
     }
 
