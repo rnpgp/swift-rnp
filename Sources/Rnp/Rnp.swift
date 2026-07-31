@@ -220,6 +220,58 @@ public final class Rnp {
         """
     }
 
+    /// JSON description of a hybrid post-quantum key pair: an
+    /// `ML-DSA-65+Ed25519` primary (signing) with an
+    /// `ML-KEM-768+X25519` subkey (encryption). This is the same hybrid
+    /// that TLS 1.3 PQ deployments use, applied to OpenPGP.
+    ///
+    /// Requires librnp built with PQ support. If the build does not
+    /// include the PQ algorithms, `generateKey(json:)` will throw.
+    public static func hybridPQKeyGenJSON(userid: String, expirationSeconds: UInt32 = 0) -> String {
+        """
+        {
+            "primary": {
+                "type": "ML-DSA-65+ED25519",
+                "userid": "\(userid)",
+                "usage": ["sign"],
+                "expiration": \(expirationSeconds),
+                "protection": { "cipher": "AES256", "hash": "SHA256" }
+            },
+            "sub": {
+                "type": "ML-KEM-768+X25519",
+                "usage": ["encrypt"],
+                "expiration": \(expirationSeconds),
+                "protection": { "cipher": "AES256", "hash": "SHA256" }
+            }
+        }
+        """
+    }
+
+    /// JSON description of a conservative PQ key pair: an SLH-DSA-SHA2
+    /// primary (hash-based, no lattice assumptions) with a classical
+    /// ECDH-Curve25519 encryption subkey. Very large signatures but
+    /// maximum long-term trust for users who distrust lattice crypto.
+    public static func conservativePQKeyGenJSON(userid: String, expirationSeconds: UInt32 = 0) -> String {
+        """
+        {
+            "primary": {
+                "type": "SLH-DSA-SHA2",
+                "userid": "\(userid)",
+                "usage": ["sign"],
+                "expiration": \(expirationSeconds),
+                "protection": { "cipher": "AES256", "hash": "SHA256" }
+            },
+            "sub": {
+                "type": "ECDH",
+                "curve": "Curve25519",
+                "usage": ["encrypt"],
+                "expiration": \(expirationSeconds),
+                "protection": { "cipher": "AES256", "hash": "SHA256" }
+            }
+        }
+        """
+    }
+
     /// Generates a subkey for the given primary key.
     ///
     /// - Parameters:
