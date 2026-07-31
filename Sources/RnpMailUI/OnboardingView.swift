@@ -23,19 +23,22 @@ public struct OnboardingView: View {
     private let onGenerate: (String, KeyAlgorithm, String, UInt32, Bool) -> Result<OnboardingGenerationResult, Error>
     private let onImport: (Data) -> Result<[KeyInfo], Error>
     private let onComplete: () -> Void
+    private let onImportFromKeyring: (() -> Void)?
 
     public init(
         isPresented: Binding<Bool>,
         viewModel: OnboardingViewModel = OnboardingViewModel(),
         onGenerate: @escaping (String, KeyAlgorithm, String, UInt32, Bool) -> Result<OnboardingGenerationResult, Error>,
         onImport: @escaping (Data) -> Result<[KeyInfo], Error>,
-        onComplete: @escaping () -> Void = {}
+        onComplete: @escaping () -> Void = {},
+        onImportFromKeyring: (() -> Void)? = nil
     ) {
         self._isPresented = isPresented
         self._viewModel = StateObject(wrappedValue: viewModel)
         self.onGenerate = onGenerate
         self.onImport = onImport
         self.onComplete = onComplete
+        self.onImportFromKeyring = onImportFromKeyring
     }
 
     public var body: some View {
@@ -84,7 +87,8 @@ public struct OnboardingView: View {
             ImportKeyForm(
                 viewModel: viewModel,
                 onImport: { viewModel.importKeys(using: onImport) },
-                onBack: { viewModel.goBack() }
+                onBack: { viewModel.goBack() },
+                onImportFromKeyring: onImportFromKeyring
             )
         case .restoreFromBackup:
             PaperKeyRestoreView(viewModel: PaperKeyRestoreViewModel(
