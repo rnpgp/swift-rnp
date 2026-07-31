@@ -123,22 +123,58 @@ public struct SecurityInformation {
     public let signingError: Error?
     /// Encryption-side failure to report (undecryptable message).
     public let encryptionError: Error?
+    /// Attachments that were encrypted inline (e.g. PGP/MIME
+    /// `application/pgp-encrypted` parts or `.pgp`/`.gpg`/`.asc` files)
+    /// and that the decoder successfully decrypted. The host app's
+    /// message banner surfaces these as a per-attachment "Save
+    /// decrypted" list. Empty when no encrypted attachments were
+    /// found or when they failed to decrypt (those failures go to
+    /// `encryptionError`).
+    public let decryptedAttachments: [DecryptedAttachment]
 
     public init(
         isEncrypted: Bool,
         signers: [SignerInfo],
         signingError: Error?,
-        encryptionError: Error?
+        encryptionError: Error?,
+        decryptedAttachments: [DecryptedAttachment] = []
     ) {
         self.isEncrypted = isEncrypted
         self.signers = signers
         self.signingError = signingError
         self.encryptionError = encryptionError
+        self.decryptedAttachments = decryptedAttachments
     }
 
     /// Whether at least one signature verified successfully.
     public var hasValidSignature: Bool {
         signers.contains { $0.status == .valid }
+    }
+}
+
+/// An attachment that the decoder found encrypted and successfully
+/// decrypted. The host app can offer a "Save decrypted" action for
+/// each entry.
+public struct DecryptedAttachment: Equatable, Sendable {
+    /// Original filename as it appeared on the encrypted part (e.g.
+    /// `"report.pdf.pgp"`). The host app can derive the decrypted
+    /// filename by stripping known PGP extensions.
+    public let originalFilename: String
+    /// Suggested filename for the decrypted content (`.pgp`/`.gpg`/
+    /// `.asc` stripped).
+    public let suggestedFilename: String
+    /// Decrypted bytes.
+    public let data: Data
+    /// MIME type sniffed from the decrypted bytes when not declared
+    /// by the part headers. Falls back to
+    /// `application/octet-stream`.
+    public let mimeType: String
+
+    public init(originalFilename: String, suggestedFilename: String, data: Data, mimeType: String) {
+        self.originalFilename = originalFilename
+        self.suggestedFilename = suggestedFilename
+        self.data = data
+        self.mimeType = mimeType
     }
 }
 
