@@ -55,6 +55,8 @@ public struct GenerateKeyForm: View {
                     Text("generateForm.algorithm.ed25519").tag(KeyAlgorithm.ed25519)
                     Text("generateForm.algorithm.rsa").tag(KeyAlgorithm.rsa)
                     Text("generateForm.algorithm.ecdsa").tag(KeyAlgorithm.ecdsa)
+                    Text("generateForm.algorithm.hybridPQ").tag(KeyAlgorithm.hybridPQ)
+                    Text("generateForm.algorithm.conservativePQ").tag(KeyAlgorithm.conservativePQ)
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("generateform.algorithm")
