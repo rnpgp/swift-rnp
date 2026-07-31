@@ -23,6 +23,10 @@ extension MailSecurityEngine {
         /// also set; consumes the librnp error string and the packet
         /// dump, if available.
         var decryptionFailure: DecryptionFailure?
+        /// Attachments the decoder found encrypted (PGP/MIME part or
+        /// `.pgp`/`.gpg`/`.asc` filename) and successfully decrypted.
+        /// Surfaced through `SecurityInformation.decryptedAttachments`.
+        var decryptedAttachments: [DecryptedAttachment] = []
     }
 
     /// Entry point running under the key manager lock; see `decode(_:)`.
@@ -305,6 +309,19 @@ extension MailSecurityEngine {
                 }
             } else {
                 let body = part.decodedBody()
+                // First: is this an encrypted attachment? Try decrypting
+                // before falling through to inline-armor scanning.
+                if let rebuilt = processEncryptedAttachment(
+                    part: part,
+                    body: body,
+                    rawPart: rawPart,
+                    outcome: &outcome,
+                    rnp: rnp
+                ) {
+                    newParts.append(rebuilt)
+                    changed = true
+                    continue
+                }
                 if let newBody = processArmorBlocks(in: body, outcome: &outcome, rnp: rnp) {
                     var headers = part.headers
                     replaceTransferEncoding(in: &headers, with: "8bit")
@@ -466,6 +483,146 @@ extension MailSecurityEngine {
         )
     }
 
+    // MARK: - Encrypted attachments
+
+    /// If `part` is an encrypted attachment (Content-Disposition: attachment
+    /// with a `.pgp`/`.gpg`/`.asc` filename, or Content-Type
+    /// `application/pgp-encrypted` / `application/pgp`), attempt decryption
+    /// and return the rebuilt part for splicing into the multipart body.
+    /// On success, appends to `outcome.decryptedAttachments`. Returns `nil`
+    /// when the part isn't an encrypted attachment or decryption fails —
+    /// the caller falls through to inline-armor scanning in the former case
+    /// and surfaces `encryptionError` in the latter.
+    private func processEncryptedAttachment(
+        part: MimeMessage,
+        body: Data,
+        rawPart: Data,
+        outcome: inout DecodeOutcome,
+        rnp: Rnp
+    ) -> Data? {
+        guard let filename = attachmentFilename(part) else { return nil }
+        guard looksLikeEncryptedAttachment(filename: filename, contentType: part.contentType) else {
+            return nil
+        }
+        let (decrypted, blockOutcome) = processOpenPGPBlob(body, rnp: rnp)
+        guard blockOutcome.processedAny, let decrypted else {
+            if let error = blockOutcome.encryptionError {
+                outcome.encryptionError = outcome.encryptionError ?? error
+            }
+            return nil
+        }
+        outcome.processedAny = true
+        outcome.isEncrypted = true
+        outcome.signers.append(contentsOf: blockOutcome.signers)
+        outcome.signingError = outcome.signingError ?? blockOutcome.signingError
+
+        let suggested = suggestDecryptedFilename(from: filename)
+        let mime = sniffMimeType(for: suggested)
+        outcome.decryptedAttachments.append(DecryptedAttachment(
+            originalFilename: filename,
+            suggestedFilename: suggested,
+            data: decrypted,
+            mimeType: mime
+        ))
+
+        // Rebuild the part with the decrypted body + adjusted headers.
+        var headers = part.headers
+        replaceFilename(in: &headers, with: suggested)
+        replaceTransferEncoding(in: &headers, with: "base64")
+        replaceContentType(in: &headers, with: mime, filename: suggested)
+        let encodedBody = Data(decrypted.base64EncodedString().utf8)
+        return serialize(headers: headers, body: encodedBody, eol: part.eol)
+    }
+
+    /// Returns the attachment filename declared in Content-Disposition
+    /// (preferred) or Content-Type name= parameter.
+    private func attachmentFilename(_ part: MimeMessage) -> String? {
+        for header in part.headers where header.name.lowercased() == "content-disposition" {
+            // filename="..." or filename=...
+            if let range = header.value.range(of: #"filename\s*=\s*"?([^";]+)"?#, options: .regularExpression) {
+                let raw = header.value[range]
+                if let eq = raw.firstIndex(of: "=") {
+                    var value = String(raw[raw.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
+                    value = value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                    return value.isEmpty ? nil : value
+                }
+            }
+        }
+        if let ct = part.contentType, let name = ct.parameters["name"], !name.isEmpty {
+            return name
+        }
+        return nil
+    }
+
+    /// True when the filename extension or declared MIME type suggests an
+    /// encrypted attachment the decoder should attempt to decrypt.
+    private func looksLikeEncryptedAttachment(filename: String, contentType: MimeMessage.ContentType?) -> Bool {
+        let lower = filename.lowercased()
+        if lower.hasSuffix(".pgp") || lower.hasSuffix(".gpg") || lower.hasSuffix(".asc") {
+            return true
+        }
+        if let ct = contentType {
+            let mediaType = "\(ct.type)/\(ct.subtype)".lowercased()
+            if mediaType == "application/pgp-encrypted" || mediaType == "application/pgp" {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Strips PGP-specific extensions from `filename` to suggest the
+    /// decrypted filename.
+    private func suggestDecryptedFilename(from filename: String) -> String {
+        let lower = filename.lowercased()
+        for ext in [".pgp", ".gpg", ".asc"] {
+            if lower.hasSuffix(ext) {
+                return String(filename.dropLast(ext.count))
+            }
+        }
+        return filename
+    }
+
+    /// Sniffs a MIME type from the decrypted file extension, falling back
+    /// to `application/octet-stream`.
+    private func sniffMimeType(for filename: String) -> String {
+        let ext = (filename as NSString).pathExtension.lowercased()
+        switch ext {
+        case "pdf": return "application/pdf"
+        case "txt": return "text/plain"
+        case "json": return "application/json"
+        case "png": return "image/png"
+        case "jpg", "jpeg": return "image/jpeg"
+        case "gif": return "image/gif"
+        case "zip": return "application/zip"
+        case "doc": return "application/msword"
+        case "docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        case "xls": return "application/vnd.ms-excel"
+        case "xlsx": return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        default: return "application/octet-stream"
+        }
+    }
+
+    private func replaceFilename(in headers: inout [MimeMessage.Header], with newFilename: String) {
+        for i in headers.indices where headers[i].name.lowercased() == "content-disposition" {
+            let regex = #"filename\s*=\s*"?[^";]+"?"#
+            if let _ = headers[i].value.range(of: regex, options: .regularExpression) {
+                headers[i].value = headers[i].value.replacingOccurrences(
+                    of: regex,
+                    with: "filename=\"\(newFilename)\"",
+                    options: .regularExpression
+                )
+                return
+            }
+        }
+    }
+
+    private func replaceContentType(in headers: inout [MimeMessage.Header], with mimeType: String, filename: String) {
+        for i in headers.indices where headers[i].name.lowercased() == "content-type" {
+            headers[i].value = "\(mimeType); name=\"\(filename)\""
+            return
+        }
+    }
+
     // MARK: - Small helpers
 
     /// Builds security information from a decode outcome, resolving signer
@@ -476,7 +633,8 @@ extension MailSecurityEngine {
             isEncrypted: outcome.isEncrypted,
             signers: signers,
             signingError: outcome.signingError ?? signingError(for: signers),
-            encryptionError: outcome.encryptionError
+            encryptionError: outcome.encryptionError,
+            decryptedAttachments: outcome.decryptedAttachments
         )
     }
 
