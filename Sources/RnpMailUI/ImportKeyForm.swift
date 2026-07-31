@@ -12,15 +12,18 @@ public struct ImportKeyForm: View {
     @ObservedObject var viewModel: OnboardingViewModel
     let onImport: () -> Void
     let onBack: () -> Void
+    let onImportFromKeyring: (() -> Void)?
 
     public init(
         viewModel: OnboardingViewModel,
         onImport: @escaping () -> Void,
-        onBack: @escaping () -> Void
+        onBack: @escaping () -> Void,
+        onImportFromKeyring: (() -> Void)? = nil
     ) {
         self.viewModel = viewModel
         self.onImport = onImport
         self.onBack = onBack
+        self.onImportFromKeyring = onImportFromKeyring
     }
 
     public var body: some View {
@@ -32,6 +35,17 @@ public struct ImportKeyForm: View {
                     .accessibilityHidden(true)
                 Text("importForm.title")
                     .font(.headline)
+            }
+
+            if let onImportFromKeyring {
+                Button {
+                    onImportFromKeyring()
+                } label: {
+                    Label("importForm.fromKeyring", systemImage: "shippingbox")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .accessibilityIdentifier("importform.from-keyring")
             }
 
             Text("importForm.message")
@@ -77,7 +91,12 @@ public struct ImportKeyForm: View {
 #if DEBUG
 struct ImportKeyForm_Previews: PreviewProvider {
     static var previews: some View {
-        ImportKeyForm(viewModel: OnboardingViewModel(), onImport: {}, onBack: {})
+        ImportKeyForm(
+            viewModel: OnboardingViewModel(),
+            onImport: {},
+            onBack: {},
+            onImportFromKeyring: {}
+        )
     }
 }
 #endif
