@@ -555,7 +555,7 @@ public final class Rnp {
     /// the passphrase — useful for sharing files via out-of-band
     /// passphrase exchange.
     ///
-    /// Wraps `rnp_op_encrypt_set_password` on a fresh encrypt operation.
+    /// Wraps `rnp_op_encrypt_add_password` on a fresh encrypt operation.
     /// No recipients are added; the S2K-derived session key is the only
     /// key. `cipher` and `hash` default to AES-256 / SHA-256, matching
     /// the public-key path.
@@ -573,7 +573,7 @@ public final class Rnp {
             try rnpCheck(rnp_op_encrypt_create(&handle, ffi, input, output.handle), operation: "encrypt symmetric create")
             return try withRnpOp(handle, destroy: rnp_op_encrypt_destroy, operation: "encrypt symmetric") { op in
                 try password.withCString { pwPtr in
-                    try rnpCheck(rnp_op_encrypt_set_password(op, pwPtr), operation: "encrypt symmetric set password")
+                    try rnpCheck(rnp_op_encrypt_add_password(op, pwPtr), operation: "encrypt symmetric set password")
                 }
                 try rnpCheck(rnp_op_encrypt_set_cipher(op, cipher), operation: "encrypt symmetric set cipher")
                 try rnpCheck(rnp_op_encrypt_set_hash(op, hash), operation: "encrypt symmetric set hash")
