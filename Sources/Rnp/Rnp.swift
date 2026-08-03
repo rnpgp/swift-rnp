@@ -550,6 +550,43 @@ public final class Rnp {
         }
     }
 
+    /// Symmetrically encrypts `plaintext` with a shared passphrase (no
+    /// public-key recipients). The output is decryptable by anyone with
+    /// the passphrase — useful for sharing files via out-of-band
+    /// passphrase exchange.
+    ///
+    /// Wraps `rnp_op_encrypt_set_password` on a fresh encrypt operation.
+    /// No recipients are added; the S2K-derived session key is the only
+    /// key. `cipher` and `hash` default to AES-256 / SHA-256, matching
+    /// the public-key path.
+    public func encryptWithPassword(
+        _ plaintext: Data,
+        password: String,
+        cipher: String = "AES256",
+        hash: String = "SHA256",
+        aead: EncryptAEAD = .none,
+        armored: Bool = false
+    ) throws -> Data {
+        let output = try MemoryOutput()
+        return try withMemoryInput(plaintext, operation: "encrypt symmetric") { input in
+            var handle: rnp_op_encrypt_t?
+            try rnpCheck(rnp_op_encrypt_create(&handle, ffi, input, output.handle), operation: "encrypt symmetric create")
+            return try withRnpOp(handle, destroy: rnp_op_encrypt_destroy, operation: "encrypt symmetric") { op in
+                try password.withCString { pwPtr in
+                    try rnpCheck(rnp_op_encrypt_set_password(op, pwPtr), operation: "encrypt symmetric set password")
+                }
+                try rnpCheck(rnp_op_encrypt_set_cipher(op, cipher), operation: "encrypt symmetric set cipher")
+                try rnpCheck(rnp_op_encrypt_set_hash(op, hash), operation: "encrypt symmetric set hash")
+                try rnpCheck(rnp_op_encrypt_set_armor(op, armored), operation: "encrypt symmetric set armor")
+                if case .ocb = aead {
+                    try rnpCheck(rnp_op_encrypt_set_aead(op, "OCB"), operation: "encrypt symmetric set aead")
+                }
+                try rnpCheck(rnp_op_encrypt_execute(op), operation: "encrypt symmetric execute")
+                return try output.readData()
+            }
+        }
+    }
+
     /// Decrypts data; the passphrase provider is consulted for protected keys.
     public func decrypt(_ encrypted: Data) throws -> Data {
         let output = try MemoryOutput()
