@@ -679,6 +679,37 @@ public final class Rnp {
         }
     }
 
+
+    // MARK: - Cleartext signing
+
+    /// Produces a cleartext-signed message (RFC 4880 §7): the original
+    /// text is preserved in human-readable form, with a detached ASCII-armored
+    /// signature appended. Recipients can read the message without any PGP
+    /// tooling and verify the signature with one.
+    ///
+    /// Wraps `rnp_op_sign_cleartext_create`. Input should be UTF-8 text data.
+    public func signCleartext(
+        _ message: Data,
+        with key: RnpKey,
+        hash: String = "SHA256"
+    ) throws -> Data {
+        let output = try MemoryOutput()
+        return try withMemoryInput(message, operation: "sign cleartext") { input in
+            var handle: rnp_op_sign_t?
+            try rnpCheck(
+                rnp_op_sign_cleartext_create(&handle, ffi, input, output.handle),
+                operation: "sign cleartext create"
+            )
+            return try withRnpOp(handle, destroy: rnp_op_sign_destroy, operation: "sign cleartext") { op in
+                try rnpCheck(rnp_op_sign_add_signature(op, key.handle, nil), operation: "sign cleartext add signature")
+                try rnpCheck(rnp_op_sign_set_hash(op, hash), operation: "sign cleartext set hash")
+                try rnpCheck(rnp_op_sign_set_armor(op, true), operation: "sign cleartext set armor")
+                try rnpCheck(rnp_op_sign_execute(op), operation: "sign cleartext execute")
+                return try output.readData()
+            }
+        }
+    }
+
     // MARK: - Verification
 
     /// Verifies data carrying an embedded signature.
