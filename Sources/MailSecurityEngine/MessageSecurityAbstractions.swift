@@ -118,12 +118,24 @@ public struct HandlerSecurityInformation {
     public var isEncrypted: Bool
     public var signingError: Error?
     public var encryptionError: Error?
+    /// Attachments the decoder found encrypted and successfully
+    /// decrypted. Empty for non-encrypted messages or for encrypted
+    /// messages with no encrypted parts. Surfaced to MailPlugin's view
+    /// controller so the user can save each decrypted attachment.
+    public var decryptedAttachments: [DecryptedAttachment]
 
-    public init(signers: [HandlerSignerInfo], isEncrypted: Bool, signingError: Error?, encryptionError: Error?) {
+    public init(
+        signers: [HandlerSignerInfo],
+        isEncrypted: Bool,
+        signingError: Error?,
+        encryptionError: Error?,
+        decryptedAttachments: [DecryptedAttachment] = []
+    ) {
         self.signers = signers
         self.isEncrypted = isEncrypted
         self.signingError = signingError
         self.encryptionError = encryptionError
+        self.decryptedAttachments = decryptedAttachments
     }
 }
 
