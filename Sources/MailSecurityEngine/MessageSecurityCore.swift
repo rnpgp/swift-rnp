@@ -451,7 +451,8 @@ public final class MessageSecurityCore {
             signers: signers,
             isEncrypted: decoded.security.isEncrypted,
             signingError: decoded.security.signingError,
-            encryptionError: decoded.security.encryptionError
+            encryptionError: decoded.security.encryptionError,
+            decryptedAttachments: decoded.security.decryptedAttachments
         )
         recordState(rawMessage: data, decoded: decoded)
         return HandlerDecodedMessage(data: decoded.data, securityInformation: information)
