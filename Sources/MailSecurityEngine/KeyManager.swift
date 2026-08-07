@@ -26,7 +26,7 @@
 import Foundation
 import KeyringStore
 import KeyStateStore
-import Rnp
+import Librnp
 import TrustStore
 
 @available(*, deprecated, message: "Use KeyringStore (persistence/CRUD) and KeyResolver (lookup) directly")

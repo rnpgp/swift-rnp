@@ -9,7 +9,7 @@
 //
 
 import XCTest
-import Rnp
+import Librnp
 import TrustStore
 @testable import MailSecurityEngine
 

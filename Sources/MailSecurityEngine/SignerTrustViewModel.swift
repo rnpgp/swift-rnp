@@ -8,7 +8,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 import TrustStore
 
 /// Visual intent for a signer trust line.

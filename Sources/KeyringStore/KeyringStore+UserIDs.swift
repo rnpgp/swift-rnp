@@ -9,7 +9,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 public extension KeyringStore {
     /// Adds a user ID to the secret key with the given fingerprint and

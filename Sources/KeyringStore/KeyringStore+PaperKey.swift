@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 public extension KeyringStore {
     /// Produces a paperkey-format text export of the secret key,

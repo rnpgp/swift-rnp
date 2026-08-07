@@ -7,7 +7,7 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .library(name: "Rnp", targets: ["Rnp"]),
+        .library(name: "Librnp", targets: ["Librnp"]),
         .library(name: "MailSecurityEngine", targets: ["MailSecurityEngine"]),
         .library(name: "KeyLifecycle", targets: ["KeyLifecycle"]),
         .library(name: "KeyServerClient", targets: ["KeyServerClient"]),
@@ -31,8 +31,9 @@ let package = Package(
             publicHeadersPath: "."
         ),
         .target(
-            name: "Rnp",
-            dependencies: ["CRnp"]
+            name: "Librnp",
+            dependencies: ["CRnp"],
+            path: "Sources/Librnp"
         ),
         .target(
             name: "TrustStore",
@@ -44,7 +45,7 @@ let package = Package(
         ),
         .target(
             name: "KeyringStore",
-            dependencies: ["Rnp", "TrustStore", "KeyStateStore"]
+            dependencies: ["Librnp", "TrustStore", "KeyStateStore"]
         ),
         .target(
             name: "Autocrypt",
@@ -56,11 +57,11 @@ let package = Package(
         ),
         .target(
             name: "MailSecurityEngine",
-            dependencies: ["Rnp", "KeyringStore", "KeyServerClient", "TrustStore", "KeyStateStore", "Autocrypt", "PostQuantum", "KeyLifecycle"]
+            dependencies: ["Librnp", "KeyringStore", "KeyServerClient", "TrustStore", "KeyStateStore", "Autocrypt", "PostQuantum", "KeyLifecycle"]
         ),
         .target(
             name: "KeyLifecycle",
-            dependencies: ["Rnp", "KeyringStore"]
+            dependencies: ["Librnp", "KeyringStore"]
         ),
         .target(
             name: "RnpMailUI",
@@ -79,11 +80,11 @@ let package = Package(
         ),
         .executableTarget(
             name: "RnpDemo",
-            dependencies: ["Rnp"]
+            dependencies: ["Librnp"]
         ),
         .testTarget(
             name: "RnpTests",
-            dependencies: ["Rnp"]
+            dependencies: ["Librnp"]
         ),
         .testTarget(
             name: "MailSecurityEngineTests",

@@ -9,7 +9,7 @@
 
 import Autocrypt
 import Foundation
-import Rnp
+import Librnp
 
 extension MailSecurityEngine {
     /// Encodes a message in PGP/MIME form, attaching the Autocrypt

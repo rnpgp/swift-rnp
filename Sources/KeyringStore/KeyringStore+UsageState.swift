@@ -19,7 +19,7 @@
 
 import Foundation
 import KeyStateStore
-import Rnp
+import Librnp
 
 /// Decoded view of a recipient address's resolution, used by the encode
 /// pipeline to surface distinct cases ("no key" vs "only an archived key")

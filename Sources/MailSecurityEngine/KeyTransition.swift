@@ -26,7 +26,7 @@
 
 import Foundation
 import KeyringStore
-import Rnp
+import Librnp
 
 /// Snapshot of a completed transition. Returned by `KeyTransition.run`
 /// for the caller to use in publish / notify UX flows.

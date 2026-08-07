@@ -20,7 +20,7 @@
 
 import AppKit
 import MailSecurityEngine
-import Rnp
+import Librnp
 import TrustStore
 
 /// Renders the "OpenPGP signature" banner: a branded header, an optional

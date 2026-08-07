@@ -4,7 +4,7 @@
 //
 
 import XCTest
-import Rnp
+import Librnp
 @testable import MailSecurityEngine
 final class EncryptionEnvelopeBridgeTests: XCTestCase {
 

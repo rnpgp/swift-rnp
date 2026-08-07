@@ -38,7 +38,7 @@
 
 import Foundation
 import LocalAuthentication
-import Rnp
+import Librnp
 import Security
 
 /// A non-fatal warning surfaced when Touch ID storage cannot be used or when

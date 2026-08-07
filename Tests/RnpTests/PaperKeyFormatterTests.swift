@@ -4,7 +4,7 @@
 //
 
 import XCTest
-@testable import Rnp
+@testable import Librnp
 
 final class PaperKeyFormatterTests: XCTestCase {
 

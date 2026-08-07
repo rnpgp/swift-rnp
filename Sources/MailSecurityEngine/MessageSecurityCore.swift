@@ -10,7 +10,7 @@
 import Foundation
 import KeyLifecycle
 import KeyringStore
-import Rnp
+import Librnp
 import TrustStore
 
 /// MailKit-independent message-security handler.

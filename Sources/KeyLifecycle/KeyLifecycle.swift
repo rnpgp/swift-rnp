@@ -8,7 +8,7 @@
 
 import Foundation
 import KeyringStore
-import Rnp
+import Librnp
 
 /// Summary returned after a subkey rotation.
 public struct RotationSummary: Equatable {

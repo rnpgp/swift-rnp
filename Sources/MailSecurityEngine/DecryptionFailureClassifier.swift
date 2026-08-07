@@ -9,7 +9,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 /// Pure data extracted from `rnp_dump_packets_to_json` output: the PKESK
 /// key IDs we observed and the algorithms used. The classifier consumes

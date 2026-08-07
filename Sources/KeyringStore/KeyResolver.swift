@@ -14,7 +14,7 @@
 
 import Foundation
 import KeyStateStore
-import Rnp
+import Librnp
 
 /// Read-only key lookup and recipient resolution over a `KeyringStore`.
 ///

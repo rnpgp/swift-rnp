@@ -9,7 +9,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 public extension MailSecurityEngine {
     /// Encodes an outgoing message under a complete `ComposePolicy`.

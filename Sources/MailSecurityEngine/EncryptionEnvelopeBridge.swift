@@ -9,7 +9,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 /// Translation of an envelope decision into the parameters the FFI
 /// `encrypt(...:aead:pkeskVersion:...)` call expects.

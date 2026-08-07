@@ -12,7 +12,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 /// One message in a send-separately bundle.
 public struct SendSeparatelyBundle: Equatable {

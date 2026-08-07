@@ -25,7 +25,7 @@ USE_PREFIX=/path/to/prefix ./scripts/build-rnp-framework.sh # dev fast path (pre
 
 ### Three-layer FFI chain
 
-`Sources/Rnp` (Swift API) → `Sources/CRnp` (system-module wrapper around `shim.h`) → `RNPFramework` (binary xcframework, fetched from `releases/download/v<ver>/RNPFramework.xcframework.zip`).
+`Sources/Librnp` (Swift API) → `Sources/CRnp` (system-module wrapper around `shim.h`) → `RNPFramework` (binary xcframework, fetched from `releases/download/v<ver>/RNPFramework.xcframework.zip`).
 
 - `Sources/CRnp/module.modulemap` exposes `shim.h` as the umbrella header. `shim.h` includes `<rnp/rnp.h>` when present, otherwise falls back to the vendored copies in `Sources/CRnp/rnp/` (used when building from Xcode without pkg-config).
 - `Sources/CRnp/dummy.c` exists so SwiftPM's link phase produces `CRnp.o`; do not remove it.
@@ -50,7 +50,7 @@ Critical details that are easy to break:
 
 ### Higher-level targets
 
-`MailSecurityEngine` is the integration kernel — it depends on `Rnp`, `KeyServerClient`, `TrustStore`, `KeyStateStore`, `Autocrypt`, and `PostQuantum`. `KeyLifecycle` and the SwiftUI targets (`RnpMailUI`, `MailSecurityUI`) sit on top. Keep the dependency graph acyclic and avoid introducing reverse edges back into `Rnp` from leaf targets.
+`MailSecurityEngine` is the integration kernel — it depends on `Librnp`, `KeyServerClient`, `TrustStore`, `KeyStateStore`, `Autocrypt`, and `PostQuantum`. `KeyLifecycle` and the SwiftUI targets (`RnpMailUI`, `MailSecurityUI`) sit on top. Keep the dependency graph acyclic and avoid introducing reverse edges back into `Librnp` from leaf targets.
 
 ## CI
 

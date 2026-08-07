@@ -8,7 +8,7 @@
 //
 
 import KeyServerClient
-import Rnp
+import Librnp
 import TrustStore
 import XCTest
 @testable import MailSecurityEngine
