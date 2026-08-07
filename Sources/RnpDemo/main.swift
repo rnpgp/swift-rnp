@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 print("librnp \(Rnp.versionStringFull)")
 

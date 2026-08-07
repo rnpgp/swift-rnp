@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import Rnp
+@testable import Librnp
 
 final class RnpTests: XCTestCase {
     private static let userid = "Test <t@t>"

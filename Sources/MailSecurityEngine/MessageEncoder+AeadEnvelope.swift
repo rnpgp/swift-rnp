@@ -18,7 +18,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 public extension MailSecurityEngine {
     /// Encodes a message in PGP/MIME form using the AEAD/v6 envelope

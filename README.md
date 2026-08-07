@@ -6,7 +6,7 @@ Swift bindings for [librnp](https://github.com/rnpgp/rnp), the open-source OpenP
 
 | Target | Purpose |
 |---|---|
-| `Rnp` | FFI wrapper around librnp. Generate keys, encrypt/decrypt, sign/verify, export formats (paperkey, Autocrypt, v6 PKESK), PQC hybrids. |
+| `Librnp` | FFI wrapper around librnp. Generate keys, encrypt/decrypt, sign/verify, export formats (paperkey, Autocrypt, v6 PKESK), PQC hybrids. |
 | `CRnp` | system-library wrapper that finds librnp via pkg-config. |
 | `PostQuantum` | Catalog of post-quantum algorithms exposed by librnp (ML-KEM, ML-DSA, SLH-DSA). |
 | `Autocrypt` | Level 1 + 1.1 (Gossip) header parse/emit, per-account prefer-encrypt policy. |
@@ -25,7 +25,7 @@ Swift bindings for [librnp](https://github.com/rnpgp/rnp), the open-source OpenP
 .package(url: "https://github.com/rnpgp/swift-rnp", from: "0.1.0")
 
 // In your target:
-import Rnp
+import Librnp
 
 let rnp = try Rnp(password: "keyring-passphrase")
 try rnp.generateKey(json: Rnp.rsaKeyGenJSON(userid: "alice@example.com"))

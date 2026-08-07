@@ -10,7 +10,7 @@
 
 import XCTest
 @testable import MailSecurityEngine
-import Rnp
+import Librnp
 import TrustStore
 
 final class MailSecurityEngineTests: XCTestCase {

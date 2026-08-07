@@ -11,7 +11,7 @@
 import Foundation
 import XCTest
 import MailSecurityEngine
-import Rnp
+import Librnp
 
 final class KeyResolverTests: XCTestCase {
     private var tempDir: URL!

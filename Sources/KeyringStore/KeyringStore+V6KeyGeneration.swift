@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 public extension KeyringStore {
     /// Generates a v6 primary keypair with a matching encryption subkey

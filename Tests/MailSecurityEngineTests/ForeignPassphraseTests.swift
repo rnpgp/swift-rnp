@@ -10,7 +10,7 @@
 
 import XCTest
 @testable import MailSecurityEngine
-import Rnp
+import Librnp
 
 final class ForeignPassphraseTests: XCTestCase {
     private static let keyringPassword = "keyring-password"

@@ -17,7 +17,7 @@ import AppKit
 import CryptoKit
 import XCTest
 import MailSecurityEngine
-import Rnp
+import Librnp
 import TrustStore
 @testable import MailSecurityUI
 

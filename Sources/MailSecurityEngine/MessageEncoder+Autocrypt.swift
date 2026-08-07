@@ -17,7 +17,7 @@
 
 import Autocrypt
 import Foundation
-import Rnp
+import Librnp
 
 /// User-facing policy controlling when the Autocrypt header is emitted.
 public enum AutocryptEmitPolicy: Equatable, Sendable {

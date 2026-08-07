@@ -17,7 +17,7 @@ import Foundation
 @_exported import KeyServerClient
 @_exported import KeyStateStore
 @_exported import KeyLifecycle
-import Rnp
+import Librnp
 @_exported import TrustStore
 
 /// Wire format used when encoding a message.

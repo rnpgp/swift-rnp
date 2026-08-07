@@ -9,7 +9,7 @@
 import XCTest
 @testable import KeyLifecycle
 import MailSecurityEngine
-import Rnp
+import Librnp
 
 final class KeyLifecycleTests: XCTestCase {
     private var tempDirectories: [URL] = []

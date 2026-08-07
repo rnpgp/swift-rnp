@@ -16,7 +16,7 @@
 
 import Foundation
 import KeyStateStore
-import Rnp
+import Librnp
 import TrustStore
 
 /// Key usage state: active vs archived (decrypt-only).

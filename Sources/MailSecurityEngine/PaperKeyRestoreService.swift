@@ -9,7 +9,7 @@
 
 import Foundation
 import KeyringStore
-import Rnp
+import Librnp
 
 /// Errors thrown by `PaperKeyRestoreService`.
 public enum PaperKeyRestoreError: Error, Equatable {

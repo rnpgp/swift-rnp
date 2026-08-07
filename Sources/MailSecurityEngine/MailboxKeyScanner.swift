@@ -15,7 +15,7 @@
 
 import Autocrypt
 import Foundation
-import Rnp
+import Librnp
 
 /// One discovered key from a mailbox scan.
 public struct DiscoveredKey: Identifiable, Equatable, Sendable {

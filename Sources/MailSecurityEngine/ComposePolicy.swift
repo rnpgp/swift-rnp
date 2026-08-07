@@ -18,7 +18,7 @@
 import Autocrypt
 import Foundation
 import PostQuantum
-import Rnp
+import Librnp
 
 /// Bundle of per-encode policies. `default` produces the safe,
 /// maximum-compatibility, maximum-interop set.

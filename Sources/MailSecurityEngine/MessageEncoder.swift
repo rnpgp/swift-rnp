@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 /// Constants for protected headers ("Memory Hole"): sensitive envelope
 /// headers travel inside the encrypted payload of a PGP/MIME message, as

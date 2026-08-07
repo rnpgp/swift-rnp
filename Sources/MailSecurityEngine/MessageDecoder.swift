@@ -8,7 +8,7 @@
 //
 
 import Foundation
-import Rnp
+import Librnp
 
 extension MailSecurityEngine {
     /// Accumulated security outcome of a decode pass.

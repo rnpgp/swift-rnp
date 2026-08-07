@@ -8,7 +8,7 @@ when a concept is introduced, sharpened, or renamed.
 
 ### KeyringStore
 
-Owns an OpenPGP keyring's persistence: the `Rnp` FFI context, the
+Owns an OpenPGP keyring's persistence: the `Rnp` FFI context (exported by the `Librnp` module), the
 recursive lock serializing access to it, the on-disk keyring files
 (`pubring.gpg` / `secring.gpg`), the `TrustStore`, and the per-key
 usage-state `KeyStateStore`.
@@ -55,7 +55,7 @@ on the underlying types directly.
 Pure key-lifecycle operations: rotation, expiry extension,
 revocation. Lives in its own SwiftPM target
 (`Sources/KeyLifecycle/KeyLifecycle.swift`) and depends only on
-`KeyringStore` + `Rnp`. No MailSecurityEngine dependency, which is
+`KeyringStore` + `Librnp`. No MailSecurityEngine dependency, which is
 what allows MailSecurityEngine to call into it (e.g. for
 `MessageSecurityCore.extendRecipientKeyExpiry`) without a circular
 import.
@@ -84,5 +84,5 @@ crypto primitives it uses come from `KeyringStore`.
 - **PostQuantum** — catalog of post-quantum algorithms exposed by
   librnp (ML-KEM, ML-DSA, SLH-DSA).
 - **KeyServerClient** — WKD / VKS / HKP key discovery and publish.
-- **Rnp** — Swift FFI wrapper around librnp. Owns the `rnp_ffi_t`
-  handle.
+- **Librnp** — Swift FFI wrapper around librnp. Owns the `rnp_ffi_t`
+  handle. Exports the `Rnp` type plus key/verification types.
